@@ -1,0 +1,59 @@
+@import "tailwindcss";
+
+/* Identidade visual Olwe */
+:root {
+  --ink: #08090d;
+  --surface: #12141b;
+  --surface-2: #1b1e28;
+  --line: #2a2e3b;
+  --text: #f5f1ea;
+  --muted: #a3a1ab;
+  --ember: #ff6a3d;
+  --amber: #ffb547;
+}
+
+@theme inline {
+  --color-ink: var(--ink);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-line: var(--line);
+  --color-text: var(--text);
+  --color-muted: var(--muted);
+  --color-ember: var(--ember);
+  --color-amber: var(--amber);
+  --font-sans: "Inter Variable", system-ui, sans-serif;
+  --font-display: "Sora Variable", "Inter Variable", system-ui, sans-serif;
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  background: var(--ink);
+  color: var(--text);
+  font-family: var(--font-sans);
+}
+
+.text-gradient {
+  background: linear-gradient(90deg, var(--ember), var(--amber));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.bg-brand {
+  background: linear-gradient(135deg, var(--ember), var(--amber));
+}
+
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 2px;
+}
