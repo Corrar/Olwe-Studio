@@ -13,16 +13,17 @@ export type CommonsShelf = { key: string; label: string; query: string; minMinut
 
 export const COMMONS_SHELVES: CommonsShelf[] = [
   { key: "longas-hd", label: "Longas clássicos restaurados em HD", query: "filetype:video fileh:>719 feature film", minMinutes: 40 },
+  { key: "comedia-hd", label: "Comédias clássicas em HD", query: "filetype:video fileh:>719 comedy film", minMinutes: 10 },
   { key: "mudos-hd", label: "Cinema mudo em HD", query: "filetype:video fileh:>719 silent film", minMinutes: 15 },
   { key: "abertos-4k", label: "Filmes abertos em 4K e Full HD", query: 'filetype:video fileh:>719 "open movie"', minMinutes: 5 },
   { key: "curtas-hd", label: "Curtas independentes em HD", query: 'filetype:video fileh:>719 "short film"', minMinutes: 5 },
-  { key: "animacao-hd", label: "Animação clássica em HD", query: "filetype:video fileh:>719 cartoon", minMinutes: 5 },
+  { key: "animacao-hd", label: "Animação clássica em HD", query: "filetype:video fileh:>719 animated cartoon", minMinutes: 5 },
 ];
 
 const OPEN_LICENSE = /^(cc[ -]?by|cc0|cc[ -]?zero|public domain|pd\b)/i;
-// Vídeos que não são filmes: aulas, 360°, eventos, notícias, trailers.
+// Vídeos que não são filmes: aulas, 360°, eventos, notícias, trailers, trechos, reações.
 const NOT_A_FILM =
-  /\b(360|vr|tutorial|lecture|webinar|teaches|interview|conference|red carpet|news|trailer|teaser|making[- ]of|behind the scenes|festival \d{4}|timelapse|time-lapse|gameplay)\b/i;
+  /\b(360|vr|tutorial|lecture|webinar|teaches|learn to draw|how to|interview|conference|red carpet|news|trailer|teaser|excerpt|reaction|making[- ]of|behind the scenes|festival \d{4}|timelapse|time-lapse|gameplay|vlog|podcast)\b/i;
 
 // Versões geradas pelo Commons, da preferida para a de reserva.
 const PLAYABLE = ["1080p.vp9.webm", "720p.vp9.webm", "480p.vp9.webm", "360p.mpeg4.mov"];
@@ -48,7 +49,9 @@ function meta(v: Raw, key: string) {
 }
 
 export function commonsTitle(fileName: string, objectName: string) {
-  const raw = objectName || fileName.replace(/\.[a-z0-9]+$/i, "").replace(/_/g, " ");
+  // Alguns arquivos trazem no nome do objeto marcações internas do Wikidata ("QS:P1476,..."): usa o nome do arquivo.
+  const usable = objectName && !/QS:|\blabel\b/.test(objectName) ? objectName : "";
+  const raw = usable || fileName.replace(/\.[a-z0-9]+$/i, "").replace(/_/g, " ");
   return cleanTitle(raw.replace(/\bin (4k|hd|full hd)\b/gi, " ")).replace(/\s+(movie|film)$/i, "").trim() || raw;
 }
 
