@@ -39,7 +39,8 @@ testar tudo sem chave. Crie a chave grátis em <https://www.themoviedb.org/setti
 ## Deploy (Vercel + Turso)
 
 1. Crie um banco no [Turso](https://turso.tech) e pegue a URL e o token.
-2. Rode as migrações apontando para ele: `DATABASE_URL=… DATABASE_AUTH_TOKEN=… npm run db:migrate`.
+2. Defina `DATABASE_URL` e `DATABASE_AUTH_TOKEN` na Vercel. As migrações rodam sozinhas quando o app inicia
+   (ou manualmente: `DATABASE_URL=… DATABASE_AUTH_TOKEN=… npm run db:migrate`).
 3. Importe o repositório na Vercel e defina as variáveis acima.
 
 ## Scripts

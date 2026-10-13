@@ -13,8 +13,11 @@ const client = createClient({ url, authToken: process.env.DATABASE_AUTH_TOKEN })
 
 export const db = drizzle(client, { schema });
 
-// Bancos em arquivo local são migrados automaticamente; o Turso é migrado com `npm run db:migrate`.
-if (url.startsWith("file:")) {
-  mkdirSync(path.dirname(url.slice("file:".length)), { recursive: true });
+// Aplica as migrações pendentes ao iniciar (arquivo local ou Turso). Se duas instâncias
+// migrarem ao mesmo tempo, uma pode falhar porque a outra já criou as tabelas: segue em frente.
+if (url.startsWith("file:")) mkdirSync(path.dirname(url.slice("file:".length)), { recursive: true });
+try {
   await migrate(db, { migrationsFolder: path.join(process.cwd(), "drizzle") });
+} catch (err) {
+  console.error("[db] falha ao aplicar migrações", err);
 }
