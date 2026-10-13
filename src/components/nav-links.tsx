@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 
 const LINKS = [
   { href: "/browse", label: "Início" },
+  { href: "/free", label: "Filmes completos" },
   { href: "/movies", label: "Filmes" },
   { href: "/series", label: "Séries" },
   { href: "/my-list", label: "Minha Lista" },

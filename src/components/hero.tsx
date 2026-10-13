@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useState, type ReactNode } from "react";
-import type { Title } from "@/lib/types";
+import { isFullMovie, type Title } from "@/lib/types";
+import { AvailabilityBadge } from "./badges";
 
 export function Hero({ items, slides }: { items: Title[]; slides: ReactNode[] }) {
   const [index, setIndex] = useState(0);
@@ -34,19 +35,20 @@ export function Hero({ items, slides }: { items: Title[]; slides: ReactNode[] })
 
       <div className="relative flex h-full max-w-2xl flex-col justify-end gap-4 px-4 pb-16 sm:px-10">
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber">
-          {current.type === "movie" ? "Filme" : "Série"} em destaque
+          {current.type === "tv" ? "Série" : "Filme"} em destaque
         </p>
         <h1 className="font-display text-4xl font-bold leading-tight sm:text-6xl">{current.title}</h1>
-        <div className="flex items-center gap-3 text-sm text-muted">
+        <div className="flex flex-wrap items-center gap-3 text-sm text-muted">
+          <AvailabilityBadge title={current} />
           {current.year && <span>{current.year}</span>}
           {current.rating > 0 && <span className="text-amber">★ {current.rating.toFixed(1)}</span>}
         </div>
         <p className="line-clamp-3 max-w-xl text-sm text-text/85 sm:text-base">{current.overview}</p>
         <div className="flex flex-wrap gap-3">
-          <Link href={`/watch/${current.type}/${current.id}`} className="bg-brand rounded-full px-6 py-3 font-semibold text-ink shadow-lg shadow-ember/20 transition hover:brightness-110">
-            ▶ Assistir
+          <Link href={`/watch/${current.type}/${encodeURIComponent(current.id)}`} className="bg-brand rounded-full px-6 py-3 font-semibold text-ink shadow-lg shadow-ember/20 transition hover:brightness-110">
+            ▶ {isFullMovie(current) ? "Assistir filme" : "Ver trailer"}
           </Link>
-          <Link href={`/title/${current.type}/${current.id}`} className="rounded-full bg-white/10 px-6 py-3 font-semibold backdrop-blur transition hover:bg-white/20">
+          <Link href={`/title/${current.type}/${encodeURIComponent(current.id)}`} className="rounded-full bg-white/10 px-6 py-3 font-semibold backdrop-blur transition hover:bg-white/20">
             Mais informações
           </Link>
         </div>

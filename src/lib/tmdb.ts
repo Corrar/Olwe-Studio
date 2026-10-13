@@ -1,7 +1,7 @@
 import "server-only";
 import { MOVIE_GENRES, TV_GENRES } from "./genres";
 import { MOCK_TITLES, mockList } from "./mock-catalog";
-import type { MediaType, Title, TitleDetails } from "./types";
+import type { Title, TitleDetails, WatchProviders } from "./types";
 
 const API = "https://api.themoviedb.org/3";
 const LANGUAGE = "pt-BR";
@@ -34,24 +34,26 @@ async function tmdb<T = Raw>(path: string, params: Record<string, string> = {}, 
   }
 }
 
-function toTitle(raw: Raw, fallbackType?: MediaType): Title | null {
-  const type: MediaType | undefined = raw.media_type ?? fallbackType;
+type TmdbType = "movie" | "tv";
+
+function toTitle(raw: Raw, fallbackType?: TmdbType): Title | null {
+  const type: TmdbType | undefined = raw.media_type ?? fallbackType;
   if (type !== "movie" && type !== "tv") return null;
   const date: string | undefined = type === "movie" ? raw.release_date : raw.first_air_date;
   return {
-    id: raw.id,
+    id: String(raw.id),
     type,
     title: (type === "movie" ? raw.title : raw.name) ?? "",
     overview: raw.overview ?? "",
-    posterPath: raw.poster_path ?? null,
-    backdropPath: raw.backdrop_path ?? null,
+    poster: imageUrl(raw.poster_path, "w500"),
+    backdrop: imageUrl(raw.backdrop_path, "w1280"),
     year: date ? date.slice(0, 4) : null,
     rating: Math.round((raw.vote_average ?? 0) * 10) / 10,
     genreIds: raw.genre_ids ?? raw.genres?.map((g: Raw) => g.id) ?? [],
   };
 }
 
-function toList(data: Raw | null, type?: MediaType): Title[] {
+function toList(data: Raw | null, type?: TmdbType): Title[] {
   return (data?.results ?? [])
     .map((r: Raw) => toTitle(r, type))
     .filter((t: Title | null): t is Title => !!t && !!t.title);
@@ -64,7 +66,7 @@ export async function getTrending(): Promise<Title[]> {
 
 export type ListKind = "popular" | "top_rated" | "now_playing" | "on_the_air";
 
-export async function getList(type: MediaType, kind: ListKind): Promise<Title[]> {
+export async function getList(type: TmdbType, kind: ListKind): Promise<Title[]> {
   if (isDemoCatalog) {
     const offset = { popular: 0, top_rated: 4, now_playing: 2, on_the_air: 5 }[kind];
     const list = mockList((t) => t.type === type, offset);
@@ -73,7 +75,7 @@ export async function getList(type: MediaType, kind: ListKind): Promise<Title[]>
   return toList(await tmdb(`/${type}/${kind}`, { region: REGION }), type);
 }
 
-export async function getByGenre(type: MediaType, genreIds: number[], page = 1): Promise<Title[]> {
+export async function getByGenre(type: TmdbType, genreIds: number[], page = 1): Promise<Title[]> {
   if (isDemoCatalog) return mockList((t) => t.type === type && t.genreIds.some((g) => genreIds.includes(g)));
   const data = await tmdb(`/discover/${type}`, {
     with_genres: genreIds.join("|"),
@@ -96,7 +98,8 @@ export async function searchTitles(query: string): Promise<Title[]> {
   return toList(await tmdb("/search/multi", { query: q, include_adult: "false" }, 600));
 }
 
-export async function getTitle(type: MediaType, id: number): Promise<TitleDetails | null> {
+export async function getTitle(type: TmdbType, id: string): Promise<TitleDetails | null> {
+  if (!/^\d+$/.test(id)) return null;
   if (isDemoCatalog) {
     const t = MOCK_TITLES.find((m) => m.type === type && m.id === id);
     if (!t) return null;
@@ -104,13 +107,13 @@ export async function getTitle(type: MediaType, id: number): Promise<TitleDetail
     return {
       ...t,
       genres: t.genreIds.map((g) => ({ id: g, name: names[g] ?? "" })).filter((g) => g.name),
-      recommendations: mockList((m) => m.type === type && m.id !== id, id % 5).slice(0, 10),
+      recommendations: mockList((m) => m.type === type && m.id !== id, Number(id) % 5).slice(0, 10),
     };
   }
 
   const extra = type === "movie" ? "release_dates" : "content_ratings";
   const raw = await tmdb(`/${type}/${id}`, {
-    append_to_response: `videos,credits,recommendations,${extra}`,
+    append_to_response: `videos,credits,recommendations,watch/providers,${extra}`,
     include_video_language: "pt,en,null",
   });
   if (!raw) return null;
@@ -148,18 +151,32 @@ export async function getTitle(type: MediaType, id: number): Promise<TitleDetail
       id: c.id,
       name: c.name,
       character: c.character ?? "",
-      profilePath: c.profile_path ?? null,
+      photo: imageUrl(c.profile_path, "w185"),
     })),
     trailerKey: trailer?.key ?? null,
     certification,
     recommendations: toList(raw.recommendations, type).slice(0, 15),
+    providers: toProviders(raw["watch/providers"]?.results?.[REGION]),
+    videoUrl: null,
+    sourceUrl: null,
+    license: null,
   };
 }
 
-/** Busca vários títulos de uma vez (Minha Lista, Continuar assistindo). */
-export async function getTitlesByRef(refs: { mediaType: MediaType; tmdbId: number }[]): Promise<Title[]> {
-  const results = await Promise.all(refs.map((r) => getTitle(r.mediaType, r.tmdbId)));
-  return results.filter((t): t is TitleDetails => !!t);
+// Dados de disponibilidade fornecidos pelo JustWatch, via TMDB.
+function toProviders(region: Raw | undefined): WatchProviders | null {
+  if (!region) return null;
+  const list = (items: Raw[] | undefined) =>
+    (items ?? []).map((p) => ({ id: p.provider_id, name: p.provider_name, logo: imageUrl(p.logo_path, "w185") }));
+  const providers = {
+    link: region.link ?? null,
+    subscription: list(region.flatrate),
+    free: [...list(region.free), ...list(region.ads)],
+    rent: list(region.rent),
+    buy: list(region.buy),
+  };
+  const total = providers.subscription.length + providers.free.length + providers.rent.length + providers.buy.length;
+  return total ? providers : null;
 }
 
 export function imageUrl(path: string | null, size: "w342" | "w500" | "w780" | "w1280" | "original" | "w185") {

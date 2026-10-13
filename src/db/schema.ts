@@ -33,11 +33,12 @@ export const watchlist = sqliteTable(
     profileId: text("profile_id")
       .notNull()
       .references(() => profiles.id, { onDelete: "cascade" }),
-    mediaType: text("media_type", { enum: ["movie", "tv"] }).notNull(),
-    tmdbId: integer("tmdb_id").notNull(),
+    mediaType: text("media_type", { enum: ["movie", "tv", "archive"] }).notNull(),
+    // ID do TMDB ou identificador do Internet Archive (a coluna mantém o nome original).
+    itemId: text("tmdb_id").notNull(),
     addedAt: createdAt(),
   },
-  (t) => [primaryKey({ columns: [t.profileId, t.mediaType, t.tmdbId] })],
+  (t) => [primaryKey({ columns: [t.profileId, t.mediaType, t.itemId] })],
 );
 
 export const progress = sqliteTable(
@@ -46,13 +47,14 @@ export const progress = sqliteTable(
     profileId: text("profile_id")
       .notNull()
       .references(() => profiles.id, { onDelete: "cascade" }),
-    mediaType: text("media_type", { enum: ["movie", "tv"] }).notNull(),
-    tmdbId: integer("tmdb_id").notNull(),
+    mediaType: text("media_type", { enum: ["movie", "tv", "archive"] }).notNull(),
+    // ID do TMDB ou identificador do Internet Archive (a coluna mantém o nome original).
+    itemId: text("tmdb_id").notNull(),
     position: integer("position").notNull().default(0),
     duration: integer("duration").notNull().default(0),
     updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().default(sql`(unixepoch())`),
   },
-  (t) => [primaryKey({ columns: [t.profileId, t.mediaType, t.tmdbId] })],
+  (t) => [primaryKey({ columns: [t.profileId, t.mediaType, t.itemId] })],
 );
 
 export type User = typeof users.$inferSelect;

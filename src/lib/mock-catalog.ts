@@ -34,12 +34,12 @@ const CAST_NAMES = ["Lia Monteiro", "Caio Rezende", "Iara Batista", "Tomás Albu
 function build(seed: Seed): TitleDetails {
   const [id, type, title, year, rating, genreIds, overview] = seed;
   return {
-    id,
+    id: String(id),
     type,
     title,
     overview,
-    posterPath: null,
-    backdropPath: null,
+    poster: null,
+    backdrop: null,
     year,
     rating,
     genreIds,
@@ -59,11 +59,15 @@ function build(seed: Seed): TitleDetails {
       id: id * 10 + i,
       name,
       character: `Personagem ${i + 1}`,
-      profilePath: null,
+      photo: null,
     })),
     trailerKey: null,
     certification: ["L", "10", "12", "14", "16"][id % 5],
     recommendations: [],
+    providers: null,
+    videoUrl: null,
+    sourceUrl: null,
+    license: null,
   };
 }
 

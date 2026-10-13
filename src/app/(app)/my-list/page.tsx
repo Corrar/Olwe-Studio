@@ -3,7 +3,7 @@ import Link from "next/link";
 import { TitleCard } from "@/components/title-card";
 import { requireProfile } from "@/lib/dal";
 import { getWatchlist } from "@/lib/library";
-import { getTitlesByRef } from "@/lib/tmdb";
+import { getTitlesByRef } from "@/lib/catalog";
 
 export const metadata: Metadata = { title: "Minha Lista" };
 

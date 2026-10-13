@@ -12,19 +12,20 @@ export async function getWatchlist(profileId: string) {
   });
 }
 
-export async function isInWatchlist(profileId: string, mediaType: MediaType, tmdbId: number) {
+export async function isInWatchlist(profileId: string, mediaType: MediaType, itemId: string) {
   const row = await db.query.watchlist.findFirst({
-    where: and(eq(watchlist.profileId, profileId), eq(watchlist.mediaType, mediaType), eq(watchlist.tmdbId, tmdbId)),
-    columns: { tmdbId: true },
+    where: and(eq(watchlist.profileId, profileId), eq(watchlist.mediaType, mediaType), eq(watchlist.itemId, itemId)),
+    columns: { itemId: true },
   });
   return !!row;
 }
 
-/** Itens começados e ainda não terminados (menos de 95% assistidos). */
+/** Filmes completos começados e ainda não terminados (menos de 95% assistidos). Trailers não contam. */
 export async function getContinueWatching(profileId: string) {
   return db.query.progress.findMany({
     where: and(
       eq(progress.profileId, profileId),
+      eq(progress.mediaType, "archive"),
       gt(progress.position, 0),
       sql`${progress.duration} = 0 or ${progress.position} < ${progress.duration} * 0.95`,
     ),
@@ -33,8 +34,8 @@ export async function getContinueWatching(profileId: string) {
   });
 }
 
-export async function getProgress(profileId: string, mediaType: MediaType, tmdbId: number) {
+export async function getProgress(profileId: string, mediaType: MediaType, itemId: string) {
   return db.query.progress.findFirst({
-    where: and(eq(progress.profileId, profileId), eq(progress.mediaType, mediaType), eq(progress.tmdbId, tmdbId)),
+    where: and(eq(progress.profileId, profileId), eq(progress.mediaType, mediaType), eq(progress.itemId, itemId)),
   });
 }

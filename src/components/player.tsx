@@ -5,9 +5,9 @@ import type { MediaType } from "@/lib/types";
 
 type Source = { kind: "youtube"; key: string } | { kind: "file"; url: string };
 
-function saveProgress(mediaType: MediaType, tmdbId: number, position: number, duration: number) {
+function saveProgress(mediaType: MediaType, itemId: string, position: number, duration: number) {
   if (!Number.isFinite(position) || position <= 0) return;
-  const body = JSON.stringify({ mediaType, tmdbId, position, duration: Number.isFinite(duration) ? duration : 0 });
+  const body = JSON.stringify({ mediaType, itemId, position, duration: Number.isFinite(duration) ? duration : 0 });
   // sendBeacon sobrevive ao fechamento da aba; fetch é o fallback.
   if (!navigator.sendBeacon?.("/api/progress", new Blob([body], { type: "application/json" }))) {
     fetch("/api/progress", { method: "POST", body, headers: { "content-type": "application/json" }, keepalive: true });
@@ -41,13 +41,15 @@ function loadYouTubeApi(): Promise<any> {
 export function Player({
   source,
   mediaType,
-  tmdbId,
+  itemId,
   startAt,
+  trackProgress = true,
 }: {
   source: Source;
   mediaType: MediaType;
-  tmdbId: number;
+  itemId: string;
   startAt: number;
+  trackProgress?: boolean;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const ytRef = useRef<HTMLDivElement>(null);
@@ -57,7 +59,7 @@ export function Player({
     if (source.kind !== "file") return;
     const video = videoRef.current;
     if (!video) return;
-    const save = () => saveProgress(mediaType, tmdbId, video.currentTime, video.duration);
+    const save = () => trackProgress && saveProgress(mediaType, itemId, video.currentTime, video.duration);
     const onLoaded = () => {
       if (startAt > 0 && startAt < video.duration - 5) video.currentTime = startAt;
     };
@@ -74,7 +76,7 @@ export function Player({
       video.removeEventListener("ended", save);
       window.removeEventListener("pagehide", save);
     };
-  }, [source, mediaType, tmdbId, startAt]);
+  }, [source, mediaType, itemId, startAt, trackProgress]);
 
   // Trailer (YouTube IFrame API)
   useEffect(() => {
@@ -83,7 +85,7 @@ export function Player({
     let interval: ReturnType<typeof setInterval>;
     let cancelled = false;
     const save = () => {
-      if (player?.getCurrentTime) saveProgress(mediaType, tmdbId, player.getCurrentTime(), player.getDuration());
+      if (trackProgress && player?.getCurrentTime) saveProgress(mediaType, itemId, player.getCurrentTime(), player.getDuration());
     };
 
     loadYouTubeApi().then((YT) => {
@@ -111,7 +113,7 @@ export function Player({
       window.removeEventListener("pagehide", save);
       player?.destroy?.();
     };
-  }, [source, mediaType, tmdbId, startAt]);
+  }, [source, mediaType, itemId, startAt, trackProgress]);
 
   if (source.kind === "file") {
     return <video ref={videoRef} src={source.url} controls autoPlay playsInline className="h-full w-full bg-black" />;

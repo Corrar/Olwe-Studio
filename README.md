@@ -2,7 +2,12 @@
 
 Plataforma de streaming de filmes e séries **sem anúncios**, com identidade visual própria.
 Next.js 16 (App Router) + TypeScript + Tailwind CSS 4, backend nas rotas do próprio Next,
-banco libSQL/SQLite via Drizzle ORM e catálogo do [TMDB](https://www.themoviedb.org/).
+banco libSQL/SQLite via Drizzle ORM e dois catálogos:
+
+- **Filmes completos e grátis** do [Internet Archive](https://archive.org): só itens com licença declarada de
+  domínio público ou Creative Commons. Tocam inteiros no player do Olwe.
+- **Filmes e séries do [TMDB](https://www.themoviedb.org/)**: só sinopse, elenco e trailer, marcados como
+  "Só sinopse e trailer", com a seção "Onde assistir" (dados do JustWatch) apontando para serviços legais.
 
 ## Funcionalidades
 
@@ -11,7 +16,7 @@ banco libSQL/SQLite via Drizzle ORM e catálogo do [TMDB](https://www.themoviedb
 - Início com destaque rotativo e fileiras: Continuar assistindo, Minha Lista, Em alta, populares, mais bem avaliados
 - Páginas de Filmes e Séries por gênero, página do título (elenco, temporadas, recomendações), busca
 - Minha Lista por perfil
-- Player com trailer do TMDB (YouTube) ou vídeo próprio, salvando o progresso para "Continuar"
+- Player que toca o filme completo (Internet Archive) salvando o progresso para "Continuar", ou o trailer do TMDB
 - Layout responsivo com navegação inferior no celular
 
 ## Rodando localmente

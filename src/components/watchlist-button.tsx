@@ -4,7 +4,7 @@ import { useOptimistic, useTransition } from "react";
 import { toggleWatchlist } from "@/app/actions/library";
 import type { MediaType } from "@/lib/types";
 
-export function WatchlistButton({ mediaType, tmdbId, initial }: { mediaType: MediaType; tmdbId: number; initial: boolean }) {
+export function WatchlistButton({ mediaType, itemId, initial }: { mediaType: MediaType; itemId: string; initial: boolean }) {
   const [saved, setSaved] = useOptimistic(initial);
   const [pending, startTransition] = useTransition();
 
@@ -16,7 +16,7 @@ export function WatchlistButton({ mediaType, tmdbId, initial }: { mediaType: Med
       onClick={() =>
         startTransition(async () => {
           setSaved(!saved);
-          await toggleWatchlist(mediaType, tmdbId);
+          await toggleWatchlist(mediaType, itemId);
         })
       }
       className="rounded-full bg-white/10 px-6 py-3 font-semibold backdrop-blur transition hover:bg-white/20 disabled:opacity-70"

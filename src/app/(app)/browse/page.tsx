@@ -5,7 +5,9 @@ import { TitleCard } from "@/components/title-card";
 import { TitleRow } from "@/components/title-row";
 import { requireProfile } from "@/lib/dal";
 import { getContinueWatching, getWatchlist } from "@/lib/library";
-import { getByGenre, getList, getTitlesByRef, getTrending } from "@/lib/tmdb";
+import { ARCHIVE_SHELVES, getArchiveShelf, KIDS_SHELF } from "@/lib/archive";
+import { getTitlesByRef } from "@/lib/catalog";
+import { getByGenre, getList, getTrending } from "@/lib/tmdb";
 
 export const metadata: Metadata = { title: "Início" };
 
@@ -13,15 +15,17 @@ export default async function BrowsePage() {
   const profile = await requireProfile();
 
   if (profile.isKids) {
-    const [animMovies, familyMovies, kidsTv] = await Promise.all([
+    const [animMovies, familyMovies, kidsTv, cartoons] = await Promise.all([
       getByGenre("movie", [16]),
       getByGenre("movie", [10751]),
       getByGenre("tv", [10762, 16]),
+      getArchiveShelf(KIDS_SHELF),
     ]);
     return (
       <>
         <HeroSection items={animMovies} />
         <div className="-mt-10 relative space-y-10">
+          <TitleRow title="Desenhos completos e grátis" items={cartoons.items} href="/free" />
           <TitleRow title="Animações" items={animMovies} />
           <TitleRow title="Séries para crianças" items={kidsTv} />
           <TitleRow title="Para ver em família" items={familyMovies} />
@@ -30,7 +34,8 @@ export default async function BrowsePage() {
     );
   }
 
-  const [trending, popularMovies, popularTv, topMovies, topTv, nowPlaying, continueRefs, listRefs] = await Promise.all([
+  const [freeMovies, trending, popularMovies, popularTv, topMovies, topTv, nowPlaying, continueRefs, listRefs] = await Promise.all([
+    getArchiveShelf(ARCHIVE_SHELVES[0]),
     getTrending(),
     getList("movie", "popular"),
     getList("tv", "popular"),
@@ -49,12 +54,13 @@ export default async function BrowsePage() {
         {continueTitles.length > 0 && (
           <Row title={`Continuar assistindo como ${profile.name}`}>
             {continueTitles.map((t) => {
-              const p = continueRefs.find((r) => r.tmdbId === t.id && r.mediaType === t.type);
+              const p = continueRefs.find((r) => r.itemId === t.id && r.mediaType === t.type);
               return <TitleCard key={`${t.type}-${t.id}`} title={t} progress={p && p.duration ? p.position / p.duration : 0} />;
             })}
           </Row>
         )}
         <TitleRow title="Minha Lista" items={myList} href="/my-list" />
+        <TitleRow title="Filmes completos e grátis" items={freeMovies.items} href="/free" />
         <TitleRow title="Em alta na semana" items={trending} />
         <TitleRow title="Filmes populares" items={popularMovies} href="/movies" />
         <TitleRow title="Séries populares" items={popularTv} href="/series" />
