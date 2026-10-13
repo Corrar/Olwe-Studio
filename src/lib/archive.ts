@@ -1,5 +1,5 @@
 import "server-only";
-import { isDemoCatalog } from "./tmdb";
+import { findMovieArtwork, isDemoCatalog } from "./tmdb";
 import type { Title, TitleDetails } from "./types";
 
 // Filmes completos e gratuitos do Internet Archive (archive.org).
@@ -62,6 +62,43 @@ function yearOf(raw: Raw) {
   return match ? match[0] : null;
 }
 
+/** Remove "(1968)", "[HD]" e afins do título do Internet Archive para buscar no TMDB. */
+function cleanTitle(title: string) {
+  return title
+    .replace(/\s*[([][^)\]]*[)\]]\s*/g, " ")
+    .replace(/\s+-\s+.*$/, "")
+    .replace(/\b(hd|sd|4k|1080p|720p|480p|full movie|restored|remastered|colori[sz]ed)\b/gi, " ")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
+/** Troca a miniatura do Internet Archive pelo pôster do TMDB quando acha o mesmo filme. */
+async function withArtwork<T extends Title>(item: T): Promise<T> {
+  const match = await findMovieArtwork(cleanTitle(item.title), item.year);
+  if (!match) return item;
+  return {
+    ...item,
+    poster: match.poster ?? item.poster,
+    backdrop: match.backdrop ?? match.poster ?? item.backdrop,
+    overview: match.overview || item.overview,
+  };
+}
+
+// Limita as chamadas simultâneas ao TMDB.
+async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  const out: R[] = new Array(items.length);
+  let next = 0;
+  await Promise.all(
+    Array.from({ length: Math.min(limit, items.length) }, async () => {
+      while (next < items.length) {
+        const i = next++;
+        out[i] = await fn(items[i]);
+      }
+    }),
+  );
+  return out;
+}
+
 const thumb = (id: string) => `https://archive.org/services/img/${encodeURIComponent(id)}`;
 
 function toTitle(raw: Raw): Title | null {
@@ -109,7 +146,7 @@ async function search(query: string, rows: number, page = 1): Promise<{ items: T
     .map(toTitle)
     .filter((t): t is Title => !!t)
     .slice(0, rows);
-  return { items, total: Number(data?.response?.numFound ?? 0) };
+  return { items: await mapLimit(items, 8, withArtwork), total: Number(data?.response?.numFound ?? 0) };
 }
 
 export async function getArchiveShelf(shelf: ArchiveShelf, rows = 30, page = 1) {
@@ -169,7 +206,7 @@ export async function getArchiveTitle(id: string): Promise<TitleDetails | null> 
     .filter(Boolean)
     .slice(0, 4);
 
-  return {
+  return withArtwork({
     ...base,
     overview: stripHtml(first(meta.description)),
     tagline: null,
@@ -186,7 +223,7 @@ export async function getArchiveTitle(id: string): Promise<TitleDetails | null> 
       : null,
     sourceUrl: `https://archive.org/details/${encodeURIComponent(id)}`,
     license: first(meta.licenseurl),
-  };
+  } satisfies TitleDetails);
 }
 
 // Itens de demonstração (sem TMDB_API_KEY): fictícios, sem vídeo.

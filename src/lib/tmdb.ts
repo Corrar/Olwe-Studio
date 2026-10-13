@@ -179,6 +179,36 @@ function toProviders(region: Raw | undefined): WatchProviders | null {
   return total ? providers : null;
 }
 
+export type ArtworkMatch = { poster: string | null; backdrop: string | null; overview: string };
+
+function normalize(text: string) {
+  return text
+    .toLocaleLowerCase("en")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+/** Procura um filme no TMDB pelo título original e ano, para usar o pôster e a sinopse em português. */
+export async function findMovieArtwork(title: string, year: string | null): Promise<ArtworkMatch | null> {
+  if (isDemoCatalog) return null;
+  const params: Record<string, string> = { query: title, include_adult: "false" };
+  if (year) params.primary_release_year = year;
+  const data = await tmdb("/search/movie", params, 60 * 60 * 24 * 7);
+  const wanted = normalize(title);
+  const match = (data?.results ?? []).find((r: Raw) => {
+    const names = [r.title, r.original_title].filter(Boolean).map((n: string) => normalize(n));
+    return r.poster_path && names.some((n: string) => n === wanted || n.startsWith(wanted) || wanted.startsWith(n));
+  });
+  if (!match) return null;
+  return {
+    poster: imageUrl(match.poster_path, "w500"),
+    backdrop: imageUrl(match.backdrop_path, "w1280"),
+    overview: match.overview ?? "",
+  };
+}
+
 export function imageUrl(path: string | null, size: "w342" | "w500" | "w780" | "w1280" | "original" | "w185") {
   return path ? `https://image.tmdb.org/t/p/${size}${path}` : null;
 }

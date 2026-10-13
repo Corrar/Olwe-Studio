@@ -39,26 +39,39 @@ export function Artwork({
 }) {
   const src = variant === "poster" ? title.poster : title.backdrop ?? title.poster;
 
-  if (src) {
-    // Só as imagens do TMDB passam pelo otimizador; as do Internet Archive vão direto.
-    const optimized = src.startsWith("https://image.tmdb.org/");
-    return (
+  const fallback = (
+    <div className="absolute inset-0 flex items-end p-3" style={{ background: fallbackGradient(title.id) }}>
+      {variant === "poster" && (
+        <span className="font-display text-base font-semibold leading-tight text-white drop-shadow">{title.title}</span>
+      )}
+    </div>
+  );
+  if (!src) return fallback;
+
+  // Imagens do TMDB passam pelo otimizador e já são pôsteres prontos.
+  if (src.startsWith("https://image.tmdb.org/")) {
+    return <Image src={src} alt="" fill sizes={sizes} priority={priority} className="object-cover" />;
+  }
+
+  // Miniaturas do Internet Archive costumam ser um quadro do filme (às vezes preto): ficam sobre o
+  // gradiente e, nos pôsteres, recebem o título por cima para o card nunca ficar vazio.
+  return (
+    <>
+      {fallback}
       <Image
         src={src}
         alt=""
         fill
         sizes={sizes}
         priority={priority}
-        unoptimized={!optimized}
-        className={variant === "backdrop" && !optimized ? "object-cover blur-sm scale-105" : "object-cover"}
+        unoptimized
+        className={variant === "backdrop" ? "object-cover blur-sm scale-105" : "object-cover"}
       />
-    );
-  }
-  return (
-    <div className="absolute inset-0 flex items-end p-3" style={{ background: fallbackGradient(title.id) }}>
       {variant === "poster" && (
-        <span className="font-display text-base font-semibold leading-tight text-white drop-shadow">{title.title}</span>
+        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/60 to-transparent p-3 pt-10">
+          <span className="font-display text-base font-semibold leading-tight text-white">{title.title}</span>
+        </div>
       )}
-    </div>
+    </>
   );
 }
