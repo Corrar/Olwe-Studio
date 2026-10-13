@@ -1,5 +1,5 @@
 import "server-only";
-import { and, desc, eq, gt, sql } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { progress, watchlist } from "@/db/schema";
 import type { MediaType } from "./types";
@@ -25,7 +25,7 @@ export async function getContinueWatching(profileId: string) {
   return db.query.progress.findMany({
     where: and(
       eq(progress.profileId, profileId),
-      eq(progress.mediaType, "archive"),
+      inArray(progress.mediaType, ["archive", "commons"]),
       gt(progress.position, 0),
       sql`${progress.duration} = 0 or ${progress.position} < ${progress.duration} * 0.95`,
     ),

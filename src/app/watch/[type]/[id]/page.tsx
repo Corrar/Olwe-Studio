@@ -22,14 +22,14 @@ export default async function WatchPage({ params }: PageProps<"/watch/[type]/[id
   const startAt = progress && progress.duration && progress.position < progress.duration * 0.95 ? progress.position : 0;
   const detailsHref = `/title/${title.type}/${encodeURIComponent(title.id)}`;
 
-  // Filme completo (Internet Archive) > vídeo próprio (DEMO_VIDEO_URL) > trailer do TMDB.
+  // Filme completo (Commons / Internet Archive) > vídeo próprio (DEMO_VIDEO_URL) > trailer do TMDB.
   const demoUrl = process.env.DEMO_VIDEO_URL;
   const source = full
-    ? title.videoUrl
-      ? ({ kind: "file", url: title.videoUrl } as const)
+    ? title.videoSources.length
+      ? ({ kind: "files", files: title.videoSources.map(({ src, type }) => ({ src, type })) } as const)
       : null
     : demoUrl
-      ? ({ kind: "file", url: demoUrl } as const)
+      ? ({ kind: "files", files: [{ src: demoUrl, type: "video/mp4" }] } as const)
       : title.trailerKey
         ? ({ kind: "youtube", key: title.trailerKey } as const)
         : null;

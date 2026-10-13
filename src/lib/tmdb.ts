@@ -157,9 +157,12 @@ export async function getTitle(type: TmdbType, id: string): Promise<TitleDetails
     certification,
     recommendations: toList(raw.recommendations, type).slice(0, 15),
     providers: toProviders(raw["watch/providers"]?.results?.[REGION]),
-    videoUrl: null,
+    videoSources: [],
     sourceUrl: null,
+    sourceName: null,
     license: null,
+    licenseName: null,
+    credit: null,
   };
 }
 

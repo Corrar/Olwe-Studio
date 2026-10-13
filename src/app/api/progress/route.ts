@@ -5,7 +5,7 @@ import { progress } from "@/db/schema";
 import { getCurrentProfile } from "@/lib/dal";
 
 const bodySchema = z.object({
-  mediaType: z.enum(["movie", "tv", "archive"]),
+  mediaType: z.enum(["movie", "tv", "archive", "commons"]),
   itemId: z.string().min(1).max(200),
   position: z.number().min(0),
   duration: z.number().min(0),

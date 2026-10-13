@@ -33,7 +33,7 @@ export const watchlist = sqliteTable(
     profileId: text("profile_id")
       .notNull()
       .references(() => profiles.id, { onDelete: "cascade" }),
-    mediaType: text("media_type", { enum: ["movie", "tv", "archive"] }).notNull(),
+    mediaType: text("media_type", { enum: ["movie", "tv", "archive", "commons"] }).notNull(),
     // ID do TMDB ou identificador do Internet Archive (a coluna mantém o nome original).
     itemId: text("tmdb_id").notNull(),
     addedAt: createdAt(),
@@ -47,7 +47,7 @@ export const progress = sqliteTable(
     profileId: text("profile_id")
       .notNull()
       .references(() => profiles.id, { onDelete: "cascade" }),
-    mediaType: text("media_type", { enum: ["movie", "tv", "archive"] }).notNull(),
+    mediaType: text("media_type", { enum: ["movie", "tv", "archive", "commons"] }).notNull(),
     // ID do TMDB ou identificador do Internet Archive (a coluna mantém o nome original).
     itemId: text("tmdb_id").notNull(),
     position: integer("position").notNull().default(0),

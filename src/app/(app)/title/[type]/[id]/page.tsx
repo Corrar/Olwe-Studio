@@ -32,12 +32,6 @@ function formatRuntime(minutes: number) {
   return h ? `${h} h ${m} min` : `${m} min`;
 }
 
-function licenseLabel(url: string) {
-  if (/publicdomain/i.test(url)) return "Domínio público";
-  const cc = url.match(/licenses\/([a-z-]+)/i);
-  return cc ? `Creative Commons ${cc[1].toUpperCase()}` : "Licença aberta";
-}
-
 export default async function TitlePage({ params }: Props) {
   const profile = await requireProfile();
   const title = await load(params);
@@ -47,7 +41,7 @@ export default async function TitlePage({ params }: Props) {
     getProgress(profile.id, title.type, title.id),
   ]);
   const resuming = progress && progress.position > 0 && (!progress.duration || progress.position < progress.duration * 0.95);
-  const canPlay = full ? !!title.videoUrl : !!title.trailerKey;
+  const canPlay = full ? title.videoSources.length > 0 : !!title.trailerKey;
   const watchHref = `/watch/${title.type}/${encodeURIComponent(title.id)}`;
 
   return (
@@ -112,16 +106,30 @@ export default async function TitlePage({ params }: Props) {
       <div className="space-y-12">
         {title.providers && <ProvidersSection providers={title.providers} />}
 
-        {full && title.license && (
+        {full && (
           <section className="px-4 text-sm text-muted sm:px-10">
             <p>
-              {licenseLabel(title.license)} · Fonte:{" "}
-              {title.sourceUrl ? (
-                <a href={title.sourceUrl} target="_blank" rel="noreferrer" className="text-amber hover:underline">
-                  Internet Archive
-                </a>
-              ) : (
-                "Internet Archive"
+              {title.credit && <>Autoria: {title.credit} · </>}
+              {title.licenseName &&
+                (title.license ? (
+                  <a href={title.license} target="_blank" rel="noreferrer" className="hover:underline">
+                    {title.licenseName}
+                  </a>
+                ) : (
+                  title.licenseName
+                ))}
+              {title.sourceName && (
+                <>
+                  {" "}
+                  · Fonte:{" "}
+                  {title.sourceUrl ? (
+                    <a href={title.sourceUrl} target="_blank" rel="noreferrer" className="text-amber hover:underline">
+                      {title.sourceName}
+                    </a>
+                  ) : (
+                    title.sourceName
+                  )}
+                </>
               )}
             </p>
           </section>

@@ -65,9 +65,12 @@ function build(seed: Seed): TitleDetails {
     certification: ["L", "10", "12", "14", "16"][id % 5],
     recommendations: [],
     providers: null,
-    videoUrl: null,
+    videoSources: [],
     sourceUrl: null,
+    sourceName: null,
     license: null,
+    licenseName: null,
+    credit: null,
   };
 }
 

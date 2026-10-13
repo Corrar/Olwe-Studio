@@ -5,7 +5,7 @@ import { TitleCard } from "@/components/title-card";
 import { TitleRow } from "@/components/title-row";
 import { requireProfile } from "@/lib/dal";
 import { getContinueWatching, getWatchlist } from "@/lib/library";
-import { ARCHIVE_SHELVES, getArchiveShelf, KIDS_SHELF } from "@/lib/archive";
+import { FREE_SHELVES, getFreeShelf, KIDS_SHELVES } from "@/lib/free";
 import { getTitlesByRef } from "@/lib/catalog";
 import { getByGenre, getList, getTrending } from "@/lib/tmdb";
 
@@ -19,13 +19,13 @@ export default async function BrowsePage() {
       getByGenre("movie", [16]),
       getByGenre("movie", [10751]),
       getByGenre("tv", [10762, 16]),
-      getArchiveShelf(KIDS_SHELF),
+      Promise.all(KIDS_SHELVES.map((s) => getFreeShelf(s.key, 16))).then((r) => r.flat()),
     ]);
     return (
       <>
         <HeroSection items={animMovies} />
         <div className="-mt-10 relative space-y-10">
-          <TitleRow title="Desenhos completos e grátis" items={cartoons.items} href="/free" />
+          <TitleRow title="Desenhos completos e grátis" items={cartoons} href="/free" />
           <TitleRow title="Animações" items={animMovies} />
           <TitleRow title="Séries para crianças" items={kidsTv} />
           <TitleRow title="Para ver em família" items={familyMovies} />
@@ -35,7 +35,7 @@ export default async function BrowsePage() {
   }
 
   const [freeMovies, trending, popularMovies, popularTv, topMovies, topTv, nowPlaying, continueRefs, listRefs] = await Promise.all([
-    getArchiveShelf(ARCHIVE_SHELVES[0]),
+    getFreeShelf(FREE_SHELVES[0].key, 16),
     getTrending(),
     getList("movie", "popular"),
     getList("tv", "popular"),
@@ -60,7 +60,7 @@ export default async function BrowsePage() {
           </Row>
         )}
         <TitleRow title="Minha Lista" items={myList} href="/my-list" />
-        <TitleRow title="Filmes completos e grátis" items={freeMovies.items} href="/free" />
+        <TitleRow title="Filmes completos e grátis em HD" items={freeMovies} href="/free" />
         <TitleRow title="Em alta na semana" items={trending} />
         <TitleRow title="Filmes populares" items={popularMovies} href="/movies" />
         <TitleRow title="Séries populares" items={popularTv} href="/series" />

@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import type { MediaType } from "@/lib/types";
 
-type Source = { kind: "youtube"; key: string } | { kind: "file"; url: string };
+type Source = { kind: "youtube"; key: string } | { kind: "files"; files: readonly { src: string; type: string }[] };
 
 function saveProgress(mediaType: MediaType, itemId: string, position: number, duration: number) {
   if (!Number.isFinite(position) || position <= 0) return;
@@ -56,7 +56,7 @@ export function Player({
 
   // Vídeo próprio (HTML5)
   useEffect(() => {
-    if (source.kind !== "file") return;
+    if (source.kind !== "files") return;
     const video = videoRef.current;
     if (!video) return;
     const save = () => trackProgress && saveProgress(mediaType, itemId, video.currentTime, video.duration);
@@ -115,8 +115,15 @@ export function Player({
     };
   }, [source, mediaType, itemId, startAt, trackProgress]);
 
-  if (source.kind === "file") {
-    return <video ref={videoRef} src={source.url} controls autoPlay playsInline className="h-full w-full bg-black" />;
+  if (source.kind === "files") {
+    // O navegador toca a primeira versão que suporta (ex.: WebM VP9 1080p; senão a de reserva).
+    return (
+      <video ref={videoRef} controls autoPlay playsInline preload="metadata" className="h-full w-full bg-black">
+        {source.files.map((f) => (
+          <source key={f.src} src={f.src} type={f.type} />
+        ))}
+      </video>
+    );
   }
   return (
     <div className="h-full w-full bg-black">
