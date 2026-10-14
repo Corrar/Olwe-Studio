@@ -3,7 +3,7 @@
 // menos 480p (qualidade de DVD).
 
 import { ADULT_CONTENT } from "../classification";
-import { legalRestriction, streamableInBrazil, type LicenseKind } from "../legal";
+import { brazilPublicDomainYear, legalRestriction, streamableInBrazil, type LicenseKind } from "../legal";
 import { isRecent, NEW_ADDITION_DAYS, qualityOf, type Title, type TitleDetails, type VideoSource } from "../types";
 import { fetchJson, first, mapLimit, safeUrl, stripHtml, truncate, type Raw } from "./shared";
 
@@ -13,7 +13,11 @@ const MIN_WIDTH = 640;
 
 export type ArchiveShelf = { key: string; label: string; query: string };
 
-const FEATURE_FILMS = "collection:(feature_films) AND mediatype:(movies)";
+// Só anos que podem ser transmitidos no Brasil (ver src/lib/legal.ts): já em domínio público aqui ou
+// de 2002 em diante (licenças Creative Commons). Assim as janelas da busca não se enchem de filmes que
+// seriam descartados depois.
+const STREAMABLE_YEARS = `(year:[1880 TO ${brazilPublicDomainYear()}] OR year:[2002 TO 2100])`;
+const FEATURE_FILMS = `collection:(feature_films) AND mediatype:(movies) AND ${STREAMABLE_YEARS}`;
 
 export const ARCHIVE_SHELVES: ArchiveShelf[] = [
   { key: "populares", label: "Clássicos mais vistos", query: FEATURE_FILMS },
@@ -24,7 +28,7 @@ export const ARCHIVE_SHELVES: ArchiveShelf[] = [
   { key: "faroeste", label: "Faroeste", query: `${FEATURE_FILMS} AND subject:(western)` },
   { key: "drama", label: "Drama", query: `${FEATURE_FILMS} AND subject:(drama)` },
   { key: "aventura", label: "Aventura", query: `${FEATURE_FILMS} AND subject:(adventure)` },
-  { key: "desenhos", label: "Desenhos clássicos", query: "collection:(animationandcartoons) AND mediatype:(movies)" },
+  { key: "desenhos", label: "Desenhos clássicos", query: `collection:(animationandcartoons) AND mediatype:(movies) AND ${STREAMABLE_YEARS}` },
 ];
 
 /** Aceita só endereços reais de licenças do creativecommons.org (licenças CC e marcas de domínio público). */
@@ -214,5 +218,7 @@ export async function searchArchive(
 
 export function archiveTextQuery(text: string) {
   const q = text.trim().slice(0, 100).replace(/[()":\\[\]{}^~*?!+&|-]/g, " ").trim();
-  return q ? `(title:(${q}) OR description:(${q})) AND mediatype:(movies) AND collection:(feature_films OR animationandcartoons)` : null;
+  return q
+    ? `(title:(${q}) OR description:(${q})) AND mediatype:(movies) AND collection:(feature_films OR animationandcartoons) AND ${STREAMABLE_YEARS}`
+    : null;
 }
