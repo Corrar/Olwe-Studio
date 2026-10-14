@@ -3,6 +3,7 @@
 // menos 480p (qualidade de DVD).
 
 import { ADULT_CONTENT } from "../classification";
+import { legalRestriction, streamableInBrazil, type LicenseKind } from "../legal";
 import { isRecent, NEW_ADDITION_DAYS, qualityOf, type Title, type TitleDetails, type VideoSource } from "../types";
 import { fetchJson, first, mapLimit, safeUrl, stripHtml, truncate, type Raw } from "./shared";
 
@@ -30,6 +31,11 @@ export const ARCHIVE_SHELVES: ArchiveShelf[] = [
 export function openLicenseUrl(value: unknown): string | null {
   const url = safeUrl(value, ["creativecommons.org"]);
   return url && /^\/(licenses|publicdomain)\//i.test(new URL(url).pathname) ? url : null;
+}
+
+function licenseKind(url: string): LicenseKind {
+  if (/publicdomain\/zero/i.test(url)) return "cc0";
+  return /publicdomain/i.test(url) ? "public-domain" : "cc";
 }
 
 function licenseName(url: string) {
@@ -127,6 +133,10 @@ export async function getArchiveDetails(id: string): Promise<TitleDetails | null
   const description = descriptions[0] ?? "";
   // Conteúdo adulto fica fora do catálogo: confere todos os assuntos e todas as descrições.
   if (ADULT_CONTENT.test(`${title} ${subjects.join(" ")} ${descriptions.join(" ")}`)) return null;
+  // Só o que a lei brasileira permite transmitir: domínio público aqui ou licença do titular, e nada
+  // de propaganda nazista ou conteúdo racista.
+  const year = yearOf(meta);
+  if (!streamableInBrazil(licenseKind(license), year) || legalRestriction({ title, year }, subjects)) return null;
 
   return {
     id,
@@ -135,7 +145,7 @@ export async function getArchiveDetails(id: string): Promise<TitleDetails | null
     overview: description,
     poster: thumb(id),
     backdrop: thumb(id),
-    year: yearOf(meta),
+    year,
     rating: 0,
     genreIds: genresOf(subjects),
     quality: qualityOf(video.width, video.height),

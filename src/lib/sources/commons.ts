@@ -4,6 +4,7 @@
 // (VP9 + Opus), que têm boa qualidade de imagem e de som com tamanho razoável.
 
 import { ADULT_CONTENT } from "../classification";
+import { legalRestriction, streamableInBrazil, type LicenseKind } from "../legal";
 import { isRecent, NEW_ADDITION_DAYS, qualityOf, type Title, type TitleDetails, type VideoSource } from "../types";
 import { fetchJson, normalize, safeUrl, stripHtml, truncate, yearFromTitle, type Raw } from "./shared";
 
@@ -23,6 +24,17 @@ export const COMMONS_SHELVES: CommonsShelf[] = [
 ];
 
 const OPEN_LICENSE = /^(cc[ -]?by|cc0|cc[ -]?zero|public domain|pd\b)/i;
+
+function licenseKind(shortName: string): LicenseKind {
+  if (/^(cc0|cc[ -]?zero)/i.test(shortName)) return "cc0";
+  return /^(public domain|pd\b)/i.test(shortName) ? "public-domain" : "cc";
+}
+
+/** Ano de lançamento: no título do objeto, no nome do arquivo ou na data original do arquivo. */
+function yearOf(v: Raw, fileName: string, objectName: string) {
+  const fromDate = meta(v, "DateTimeOriginal").match(/\b(18[89]\d|19\d{2}|20\d{2})\b/);
+  return yearFromTitle(objectName) ?? yearFromTitle(fileName) ?? (fromDate ? fromDate[1] : null);
+}
 // Vídeos que não são filmes: aulas, 360°, eventos, notícias, trailers, trechos, reações.
 const NOT_A_FILM =
   /\b(360|vr|tutorial|lecture|webinar|teaches|learn to draw|how to|interview|conference|red carpet|news|trailer|teaser|excerpt|reaction|making[- ]of|behind the scenes|festival \d{4}|timelapse|time-lapse|gameplay|vlog|podcast)\b/i;
@@ -35,7 +47,7 @@ const VIDEO_PROPS = {
   prop: "videoinfo",
   viprop: "timestamp|url|size|mime|mediatype|derivatives|extmetadata",
   viurlwidth: "1280",
-  viextmetadatafilter: "LicenseShortName|LicenseUrl|Artist|Attribution|ObjectName|ImageDescription",
+  viextmetadatafilter: "LicenseShortName|LicenseUrl|Artist|Attribution|ObjectName|ImageDescription|DateTimeOriginal",
 };
 
 const isValidResponse = (body: Raw) => !body.error && (!!body.query || !!body.batchcomplete);
@@ -113,17 +125,22 @@ function toCandidate(page: Raw, minMinutes: number): Candidate | null {
   if (NOT_A_FILM.test(fileName) || NOT_A_FILM.test(objectName)) return null;
   // Conteúdo adulto fica fora do catálogo.
   if (ADULT_CONTENT.test(`${fileName} ${objectName} ${meta(v, "ImageDescription")}`)) return null;
+  // Só o que a lei brasileira permite transmitir (domínio público aqui ou licença do titular).
+  const title = commonsTitle(fileName, objectName);
+  const year = yearOf(v, fileName, objectName);
+  if (!streamableInBrazil(licenseKind(meta(v, "LicenseShortName")), year)) return null;
+  if (legalRestriction({ title, originalTitle: objectName || fileName, year })) return null;
   const served = bestServed(v);
 
   return {
     title: {
       id: fileName,
       type: "commons",
-      title: commonsTitle(fileName, objectName),
+      title,
       overview: meta(v, "ImageDescription").slice(0, 600),
       poster: thumbAt(v.thumburl, 500),
       backdrop: thumbAt(v.thumburl, 1280),
-      year: yearFromTitle(objectName) ?? yearFromTitle(fileName),
+      year,
       rating: 0,
       genreIds: [],
       quality: qualityOf(served.width, served.height),

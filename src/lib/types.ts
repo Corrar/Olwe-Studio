@@ -12,6 +12,8 @@ export interface Title {
   id: string;
   type: MediaType;
   title: string;
+  /** Título original (TMDB), usado nas regras legais do catálogo. */
+  originalTitle?: string | null;
   overview: string;
   /** URLs completas das imagens. */
   poster: string | null;

@@ -1,6 +1,7 @@
 import "server-only";
 import { BLOCKED_RATING, clampLimit, estimateRating, isAllowed, type AgeRating, type RatingInfo } from "./classification";
 import type { Profile } from "@/db/schema";
+import { legalRestriction } from "./legal";
 import { getTmdbRating } from "./tmdb";
 import type { Title } from "./types";
 
@@ -34,9 +35,15 @@ export async function withRatings<T extends Title>(items: T[]): Promise<T[]> {
   return Promise.all(items.map(async (t) => ({ ...t, ageRating: await ratingOf(t) })));
 }
 
-/** Classifica e mantém só o que o perfil pode ver. Conteúdo adulto, 18+ e sem classificação confirmada nunca passam. */
+/** Títulos que nunca aparecem: adultos ou proibidos por lei (ver src/lib/legal.ts). */
+const excluded = (t: Title) => t.adult === true || legalRestriction(t) !== null;
+
+/**
+ * Classifica e mantém só o que o perfil pode ver. Conteúdo adulto, proibido por lei, 18+ e sem
+ * classificação confirmada nunca passam.
+ */
 export async function forViewer<T extends Title>(items: T[], viewer: Viewer): Promise<T[]> {
-  const rated = await withRatings(items.filter((t) => !t.adult));
+  const rated = await withRatings(items.filter((t) => !excluded(t)));
   return rated.filter((t) => isAllowed(t.ageRating, viewer.maxRating, viewer.isKids));
 }
 
@@ -48,7 +55,7 @@ export type Access =
 
 /** Regra de acesso direto a um título (página do título e player). */
 export async function accessFor(t: Title, viewer: Viewer): Promise<Access> {
-  if (t.adult) return { status: "removed", rating: null };
+  if (excluded(t)) return { status: "removed", rating: null };
   const rating = await ratingOf(t);
   if (!rating) return { status: "unavailable", rating: null };
   if (rating.value >= BLOCKED_RATING) return { status: "removed", rating };

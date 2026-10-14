@@ -95,6 +95,7 @@ function toTitle(raw: Raw, fallbackType?: TmdbType): Title | null {
     id: String(raw.id),
     type,
     title: (type === "movie" ? raw.title : raw.name) ?? "",
+    originalTitle: (type === "movie" ? raw.original_title : raw.original_name) ?? null,
     overview: raw.overview ?? "",
     poster: imageUrl(raw.poster_path, "w500"),
     backdrop: imageUrl(raw.backdrop_path, "w1280"),
