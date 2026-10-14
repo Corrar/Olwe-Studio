@@ -43,6 +43,7 @@ function build(seed: Seed): TitleDetails {
     year,
     rating,
     genreIds,
+    isNew: Number(year) >= new Date().getFullYear(),
     tagline: null,
     genres: [],
     runtime: type === "movie" ? 95 + (id % 7) * 6 : null,

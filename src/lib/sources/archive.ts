@@ -2,7 +2,7 @@
 // Só entram itens com licença declarada de domínio público ou Creative Commons, com um MP4 de pelo
 // menos 480p (qualidade de DVD).
 
-import { qualityOf, type Title, type TitleDetails, type VideoSource } from "../types";
+import { isRecent, NEW_ADDITION_DAYS, qualityOf, type Title, type TitleDetails, type VideoSource } from "../types";
 import { fetchJson, first, mapLimit, safeUrl, stripHtml, truncate, type Raw } from "./shared";
 
 const SEARCH = "https://archive.org/advancedsearch.php";
@@ -112,6 +112,7 @@ export async function getArchiveDetails(id: string): Promise<TitleDetails | null
     rating: 0,
     genreIds: [],
     quality: qualityOf(video.width, video.height),
+    isNew: isRecent(first(meta.publicdate) || first(meta.addeddate), NEW_ADDITION_DAYS),
     tagline: null,
     genres: subjects.map((name: string, i: number) => ({ id: i, name })),
     runtime: parseRuntime(first(meta.runtime), files),
@@ -157,7 +158,7 @@ export async function searchArchive(
   const details = await mapLimit(ids, 6, getArchiveDetails);
   const items = details
     .filter((t): t is TitleDetails => !!t && t.videoSources.length > 0)
-    .map(({ id, type, title, overview, poster, backdrop, year, rating, genreIds, quality }) => ({
+    .map(({ id, type, title, overview, poster, backdrop, year, rating, genreIds, quality, isNew }) => ({
       id,
       type,
       title,
@@ -168,6 +169,7 @@ export async function searchArchive(
       rating,
       genreIds,
       quality,
+      isNew,
     }));
   const total = Number(data?.response?.numFound ?? 0);
   return { items: rows ? items.slice(0, rows) : items, hasMore: page * window < total };

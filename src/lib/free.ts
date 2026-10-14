@@ -109,6 +109,7 @@ const DEMO: TitleDetails[] = (
   rating: 0,
   genreIds: [],
   quality,
+  isNew: id === "Olwe demo Origami.webm",
   tagline: null,
   genres: [],
   runtime: type === "commons" ? 12 : 80,

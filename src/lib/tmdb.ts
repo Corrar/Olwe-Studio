@@ -1,7 +1,7 @@
 import "server-only";
 import { MOVIE_GENRES, TV_GENRES } from "./genres";
 import { MOCK_TITLES, mockList } from "./mock-catalog";
-import type { Title, TitleDetails, WatchProviders } from "./types";
+import { isRecent, NEW_RELEASE_DAYS, type Title, type TitleDetails, type WatchProviders } from "./types";
 
 const API = "https://api.themoviedb.org/3";
 const LANGUAGE = "pt-BR";
@@ -50,6 +50,7 @@ function toTitle(raw: Raw, fallbackType?: TmdbType): Title | null {
     year: date ? date.slice(0, 4) : null,
     rating: Math.round((raw.vote_average ?? 0) * 10) / 10,
     genreIds: raw.genre_ids ?? raw.genres?.map((g: Raw) => g.id) ?? [],
+    isNew: isRecent(date, NEW_RELEASE_DAYS),
   };
 }
 

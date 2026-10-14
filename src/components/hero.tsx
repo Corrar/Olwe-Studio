@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState, type ReactNode } from "react";
 import { isFullMovie, type Title } from "@/lib/types";
-import { AvailabilityBadge } from "./badges";
+import { AvailabilityBadge, NewBadge } from "./badges";
 
 export function Hero({ items, slides }: { items: Title[]; slides: ReactNode[] }) {
   const [index, setIndex] = useState(0);
@@ -39,6 +39,7 @@ export function Hero({ items, slides }: { items: Title[]; slides: ReactNode[] })
         </p>
         <h1 className="font-display text-4xl font-bold leading-tight sm:text-6xl">{current.title}</h1>
         <div className="flex flex-wrap items-center gap-3 text-sm text-muted">
+          <NewBadge title={current} />
           <AvailabilityBadge title={current} />
           {current.year && <span>{current.year}</span>}
           {current.rating > 0 && <span className="text-amber">★ {current.rating.toFixed(1)}</span>}

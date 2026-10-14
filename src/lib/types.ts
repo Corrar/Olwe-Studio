@@ -19,6 +19,8 @@ export interface Title {
   genreIds: number[];
   /** Qualidade do vídeo que o Olwe toca (só filmes completos): "4K", "Full HD", "HD" ou "SD". */
   quality?: Quality | null;
+  /** Lançado (TMDB) ou adicionado à fonte (filmes completos) recentemente: mostra o selo "Novo". */
+  isNew?: boolean;
 }
 
 export type Quality = "4K" | "Full HD" | "HD" | "SD";
@@ -87,6 +89,17 @@ export function isFullMovie(t: Pick<Title, "type">) {
 
 export function isMediaType(value: string): value is MediaType {
   return value === "movie" || value === "tv" || value === "archive" || value === "commons";
+}
+
+/** Prazos do selo "Novo". */
+export const NEW_RELEASE_DAYS = 60;
+export const NEW_ADDITION_DAYS = 30;
+
+/** Se a data (ISO ou "AAAA-MM-DD hh:mm:ss") caiu nos últimos `days` dias, sem contar datas futuras. */
+export function isRecent(date: unknown, days: number, now = Date.now()): boolean {
+  if (typeof date !== "string" || !date) return false;
+  const time = Date.parse(date.includes("T") || date.length <= 10 ? date : date.replace(" ", "T") + "Z");
+  return Number.isFinite(time) && time <= now && now - time <= days * 24 * 60 * 60 * 1000;
 }
 
 /** Rótulo de qualidade pela resolução do arquivo que será tocado. */

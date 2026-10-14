@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { Title } from "@/lib/types";
 import { Artwork } from "./artwork";
-import { AvailabilityBadge } from "./badges";
+import { AvailabilityBadge, NewBadge } from "./badges";
 
 export function TitleCard({ title, progress }: { title: Title; progress?: number }) {
   return (
@@ -12,7 +12,8 @@ export function TitleCard({ title, progress }: { title: Title; progress?: number
     >
       <div className="relative aspect-[2/3] overflow-hidden rounded-lg bg-surface-2 ring-1 ring-white/5 transition duration-300 group-hover/card:scale-[1.04] group-hover/card:ring-amber/70">
         <Artwork title={title} variant="poster" sizes="(min-width: 1024px) 192px, (min-width: 640px) 176px, 144px" />
-        <span className="absolute left-2 top-2">
+        <span className="absolute inset-x-2 top-2 flex flex-wrap items-start gap-1">
+          <NewBadge title={title} size="sm" />
           <AvailabilityBadge title={title} size="sm" />
         </span>
         {progress !== undefined && (

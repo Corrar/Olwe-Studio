@@ -3,7 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Artwork } from "@/components/artwork";
-import { AvailabilityBadge } from "@/components/badges";
+import { AvailabilityBadge, NewBadge } from "@/components/badges";
 import { TitleRow } from "@/components/title-row";
 import { WatchlistButton } from "@/components/watchlist-button";
 import { getTitle } from "@/lib/catalog";
@@ -59,6 +59,7 @@ export default async function TitlePage({ params }: Props) {
           {title.tagline && <p className="text-lg italic text-text/80">{title.tagline}</p>}
 
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted">
+            <NewBadge title={title} />
             <AvailabilityBadge title={title} />
             {title.rating > 0 && <span className="font-semibold text-amber">★ {title.rating.toFixed(1)}</span>}
             {title.year && <span>{title.year}</span>}

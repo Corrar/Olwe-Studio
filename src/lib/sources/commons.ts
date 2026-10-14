@@ -3,7 +3,7 @@
 // menos 720p e duração mínima. O Olwe toca as versões que o próprio Commons gera para navegadores
 // (VP9 + Opus), que têm boa qualidade de imagem e de som com tamanho razoável.
 
-import { qualityOf, type Title, type TitleDetails, type VideoSource } from "../types";
+import { isRecent, NEW_ADDITION_DAYS, qualityOf, type Title, type TitleDetails, type VideoSource } from "../types";
 import { fetchJson, normalize, safeUrl, stripHtml, truncate, yearFromTitle, type Raw } from "./shared";
 
 const API = "https://commons.wikimedia.org/w/api.php";
@@ -32,7 +32,7 @@ const HD = new Set(["1080p.vp9.webm", "720p.vp9.webm"]);
 
 const VIDEO_PROPS = {
   prop: "videoinfo",
-  viprop: "url|size|mime|mediatype|derivatives|extmetadata",
+  viprop: "timestamp|url|size|mime|mediatype|derivatives|extmetadata",
   viurlwidth: "1280",
   viextmetadatafilter: "LicenseShortName|LicenseUrl|Artist|Attribution|ObjectName|ImageDescription",
 };
@@ -54,7 +54,7 @@ function meta(v: Raw, key: string) {
 // Sufixos de divulgação depois de " - " ("Official ... release", "Blender Open Movie", "16mm - Silent - UHD").
 // Um subtítulo de verdade ("Betty Boop - Minnie the Moocher") é mantido.
 const PROMO_SUFFIX =
-  /\s+[-–—|]\s+(official\b.*|.*\bopen movie\b.*|.*\brelease\b.*|.*\bfeature film\b.*|full (movie|film)\b.*|restored\b.*|remaster.*|\d{3,4}p\b.*|(hd|4k|uhd)\b.*|(16|35|super 8)\s?mm\b.*)$/i;
+  /\s+[-–—|]\s+(official\b.*|.*\bblender\b.*|.*\bopen movie\b.*|.*\brelease\b.*|.*\bfeature film\b.*|full (movie|film)\b.*|restored\b.*|remaster.*|\d{3,4}p\b.*|(hd|4k|uhd)\b.*|(16|35|super 8)\s?mm\b.*)$/i;
 
 /** Título exibido: sem ano, marcas de qualidade e sufixos de divulgação, mas com o subtítulo. */
 export function commonsTitle(fileName: string, objectName: string) {
@@ -66,10 +66,10 @@ export function commonsTitle(fileName: string, objectName: string) {
     .replace(/\bin (4k|hd|full hd)\b/gi, " ")
     .replace(PROMO_SUFFIX, "")
     .replace(/\b(4k|uhd|\d{3,4}p\d*|full movie|full film)\b/gi, " ")
-    .replace(/[-–—|]\s*$/, "")
-    .replace(/\s+movie$/i, "")
     .replace(/\s{2,}/g, " ")
-    .trim();
+    .trim()
+    .replace(/\s*[-–—|]$/, "")
+    .replace(/\s+movie$/i, "");
   return title || raw;
 }
 
@@ -124,6 +124,7 @@ function toCandidate(page: Raw, minMinutes: number): Candidate | null {
       rating: 0,
       genreIds: [],
       quality: qualityOf(served.width, served.height),
+      isNew: isRecent(v.timestamp, NEW_ADDITION_DAYS),
     },
     // Resolução do arquivo original, para escolher o melhor entre duplicados.
     height: Number(v.height) || 0,
