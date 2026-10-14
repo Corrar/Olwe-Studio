@@ -14,9 +14,13 @@ export function muxEnabled() {
   return !!process.env.MUX_TOKEN_ID && !!process.env.MUX_TOKEN_SECRET;
 }
 
-/** Vídeos novos com playback assinado (MUX_SIGNING_KEY_ID e MUX_SIGNING_KEY_PRIVATE). */
+// Chave de assinatura: aceita os nomes do Olwe e os do SDK/painel do Mux (MUX_SIGNING_KEY, MUX_PRIVATE_KEY).
+const signingKeyId = () => process.env.MUX_SIGNING_KEY_ID || process.env.MUX_SIGNING_KEY || "";
+const signingKeyPrivate = () => (process.env.MUX_SIGNING_KEY_PRIVATE || process.env.MUX_PRIVATE_KEY || "").trim();
+
+/** Vídeos novos com playback assinado (ID e chave privada da Signing Key do Mux). */
 export function muxSigning() {
-  return !!process.env.MUX_SIGNING_KEY_ID && !!process.env.MUX_SIGNING_KEY_PRIVATE;
+  return !!signingKeyId() && !!signingKeyPrivate();
 }
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -98,8 +102,9 @@ export async function deleteAsset(assetId: string) {
 
 let signingKey: KeyObject | null = null;
 function key() {
-  // O Mux entrega a chave privada em base64 (PEM RSA).
-  signingKey ??= createPrivateKey(Buffer.from(process.env.MUX_SIGNING_KEY_PRIVATE!, "base64").toString("utf8"));
+  // O Mux entrega a chave privada em base64 (PEM RSA); colada já como PEM, também vale.
+  const raw = signingKeyPrivate();
+  signingKey ??= createPrivateKey(raw.includes("BEGIN") ? raw.replace(/\\n/g, "\n") : Buffer.from(raw, "base64").toString("utf8"));
   return signingKey;
 }
 
@@ -109,7 +114,7 @@ export async function playbackUrl(playbackId: string, signed: boolean) {
   if (!signed) return base;
   if (!muxSigning()) return null;
   const token = await new SignJWT({ sub: playbackId, aud: "v" })
-    .setProtectedHeader({ alg: "RS256", kid: process.env.MUX_SIGNING_KEY_ID })
+    .setProtectedHeader({ alg: "RS256", kid: signingKeyId() })
     .setExpirationTime(`${TOKEN_HOURS}h`)
     .sign(key());
   return `${base}?token=${token}`;
