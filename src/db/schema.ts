@@ -11,7 +11,9 @@ export const users = sqliteTable(
     email: text("email").notNull(),
     name: text("name").notNull(),
     passwordHash: text("password_hash").notNull(),
-    /** Quando o e-mail foi confirmado pelo link enviado no cadastro (null = ainda não confirmado). */
+    /** Conta criada com confirmação de e-mail obrigatória e ainda não confirmada. */
+    emailVerificationPending: integer("email_verification_pending", { mode: "boolean" }).notNull().default(false),
+    /** Quando o e-mail foi confirmado pelo link enviado no cadastro. */
     emailVerifiedAt: integer("email_verified_at", { mode: "timestamp" }),
     /** Último envio do e-mail de confirmação, para limitar reenvios. */
     verificationSentAt: integer("verification_sent_at", { mode: "timestamp" }),
@@ -32,6 +34,11 @@ export const profiles = sqliteTable("profiles", {
   maxRating: integer("max_rating").notNull().default(16),
   /** Bloqueio de perfil (como na Netflix): hash do PIN de 4 dígitos, ou null sem bloqueio. */
   pinHash: text("pin_hash"),
+  /** Muda a cada alteração do bloqueio: invalida os acessos já liberados com o PIN antigo. */
+  lockVersion: integer("lock_version").notNull().default(0),
+  /** Tentativas erradas de PIN seguidas e até quando o PIN fica travado depois de muitas. */
+  pinFailedAttempts: integer("pin_failed_attempts").notNull().default(0),
+  pinLockedUntil: integer("pin_locked_until", { mode: "timestamp" }),
   createdAt: createdAt(),
 });
 
@@ -64,6 +71,13 @@ export const progress = sqliteTable(
   },
   (t) => [primaryKey({ columns: [t.profileId, t.mediaType, t.itemId] })],
 );
+
+/** Contadores de limite de uso (ex.: cadastros por IP), com janela que reinicia sozinha. */
+export const rateLimits = sqliteTable("rate_limits", {
+  key: text("key").primaryKey(),
+  count: integer("count").notNull().default(0),
+  resetAt: integer("reset_at", { mode: "timestamp" }).notNull(),
+});
 
 export type User = typeof users.$inferSelect;
 export type Profile = typeof profiles.$inferSelect;

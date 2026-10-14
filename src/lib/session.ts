@@ -51,24 +51,36 @@ export async function deleteSession() {
 }
 
 // O perfil ativo também vai assinado: com o bloqueio de perfil, não pode ser trocado editando o cookie.
-export async function setActiveProfileId(profileId: string) {
-  const token = await new SignJWT({ profileId })
+// Perfil bloqueado: o acesso liberado pelo PIN guarda a versão do bloqueio (trocar ou remover o PIN
+// invalida os acessos antigos), dura no máximo 4 horas e acaba quando o navegador fecha.
+const UNLOCKED_MAX_AGE = 60 * 60 * 4;
+
+export async function setActiveProfileId(profileId: string, lockVersion?: number) {
+  const locked = lockVersion !== undefined;
+  const token = await new SignJWT(locked ? { profileId, lockVersion } : { profileId })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
-    .setExpirationTime(`${MAX_AGE}s`)
+    .setExpirationTime(`${locked ? UNLOCKED_MAX_AGE : MAX_AGE}s`)
     .sign(secretKey());
-  (await cookies()).set(PROFILE_COOKIE, token, cookieOptions);
+  const { maxAge, ...sessionOnly } = cookieOptions;
+  (await cookies()).set(PROFILE_COOKIE, token, locked ? sessionOnly : { ...sessionOnly, maxAge });
 }
 
-export async function getActiveProfileId(): Promise<string | null> {
+export async function getActiveProfile(): Promise<{ profileId: string; lockVersion: number | null } | null> {
   const token = (await cookies()).get(PROFILE_COOKIE)?.value;
   if (!token) return null;
   try {
     const { payload } = await jwtVerify(token, secretKey(), { algorithms: ["HS256"] });
-    return typeof payload.profileId === "string" ? payload.profileId : null;
+    if (typeof payload.profileId !== "string") return null;
+    return { profileId: payload.profileId, lockVersion: typeof payload.lockVersion === "number" ? payload.lockVersion : null };
   } catch {
     return null;
   }
+}
+
+/** Sai do perfil ativo (volta para "Quem está assistindo?"). */
+export async function clearActiveProfile() {
+  (await cookies()).delete(PROFILE_COOKIE);
 }
 
 /** Token assinado de uso único por finalidade (ex.: link de confirmação de e-mail). */

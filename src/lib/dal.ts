@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { cache } from "react";
 import { db } from "@/db";
 import { profiles, users } from "@/db/schema";
-import { getActiveProfileId, getSessionUserId } from "./session";
+import { getActiveProfile, getSessionUserId } from "./session";
 import { verificationRequired } from "./verification";
 
 export const getCurrentUser = cache(async () => {
@@ -12,7 +12,7 @@ export const getCurrentUser = cache(async () => {
   if (!userId) return null;
   const user = await db.query.users.findFirst({
     where: eq(users.id, userId),
-    columns: { id: true, name: true, email: true, emailVerifiedAt: true, verificationSentAt: true },
+    columns: { id: true, name: true, email: true, emailVerificationPending: true, emailVerifiedAt: true, verificationSentAt: true },
   });
   return user ?? null;
 });
@@ -27,12 +27,14 @@ export async function requireUser() {
 
 export const getCurrentProfile = cache(async () => {
   const user = await getCurrentUser();
-  const profileId = await getActiveProfileId();
-  if (!user || !profileId || verificationRequired(user)) return null;
+  const active = await getActiveProfile();
+  if (!user || !active || verificationRequired(user)) return null;
   const profile = await db.query.profiles.findFirst({
-    where: and(eq(profiles.id, profileId), eq(profiles.userId, user.id)),
+    where: and(eq(profiles.id, active.profileId), eq(profiles.userId, user.id)),
   });
-  return profile ?? null;
+  // Perfil bloqueado só vale com o acesso liberado pelo PIN atual.
+  if (!profile || (profile.pinHash && active.lockVersion !== profile.lockVersion)) return null;
+  return profile;
 });
 
 export async function requireProfile() {

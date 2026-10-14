@@ -181,8 +181,15 @@ export async function getTitle(type: TmdbType, id: string): Promise<TitleDetails
     videos.find((v) => v.site === "YouTube" && v.type === "Trailer") ??
     videos.find((v) => v.site === "YouTube" && v.type === "Teaser");
 
-  // Sem classificação em nenhum país, vale a estimativa (que considera gêneros, título e sinopse).
-  const ageRating = ratingFromRaw(type, raw) ?? estimateRating(base.genreIds, `${base.title} ${base.overview.slice(0, 600)}`);
+  // Sem classificação em nenhum país, vale a estimativa (que considera gêneros, título e sinopse); com
+  // só a de outro país (também estimada), vale a mais alta das duas, como em ratingOf.
+  const estimate = estimateRating(base.genreIds, `${base.title} ${base.overview.slice(0, 600)}`);
+  const fromRaw = ratingFromRaw(type, raw);
+  const ageRating: RatingInfo = !fromRaw
+    ? estimate
+    : fromRaw.source === "estimada"
+      ? { ...fromRaw, value: fromRaw.value > estimate.value ? fromRaw.value : estimate.value }
+      : fromRaw;
   const certification = ageRating && ageRating.source === "oficial" ? (ageRating.value === 0 ? "L" : String(ageRating.value)) : null;
 
   return {

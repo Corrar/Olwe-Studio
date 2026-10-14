@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useState } from "react";
+import { useActionState, useState, useTransition } from "react";
 import { createProfile } from "@/app/actions/profiles";
 import { Avatar } from "@/components/avatar";
 import { AVATARS } from "@/lib/avatars";
@@ -9,6 +9,7 @@ import { DEFAULT_ADULT_LIMIT, DEFAULT_KIDS_LIMIT, KIDS_MAX_LIMIT, limitLabel, PR
 
 export function ProfileForm() {
   const [state, action, pending] = useActionState(createProfile, undefined);
+  const [, startTransition] = useTransition();
   const [name, setName] = useState("");
   const [avatar, setAvatar] = useState<string>(AVATARS[0].id);
   const [isKids, setIsKids] = useState(false);
@@ -16,7 +17,17 @@ export function ProfileForm() {
   const limits = PROFILE_LIMITS.filter((l) => !isKids || l <= KIDS_MAX_LIMIT);
 
   return (
-    <form action={action} className="w-full max-w-sm space-y-6">
+    <form
+      action={action}
+      // Envio manual: o React limparia o formulário depois da ação e o limite escolhido voltaria para o
+      // primeiro item da lista, mesmo com o select controlado. Assim, um erro mantém o que foi preenchido.
+      onSubmit={(e) => {
+        e.preventDefault();
+        const data = new FormData(e.currentTarget);
+        startTransition(() => action(data));
+      }}
+      className="w-full max-w-sm space-y-6"
+    >
       <div className="flex justify-center">
         <Avatar avatar={avatar} name={name || "?"} size={96} />
       </div>

@@ -98,7 +98,8 @@ export function isAdultsOnly(cert: unknown, country = ""): boolean {
 }
 
 // Códigos sem idade usados por vários países (Reino Unido, França, Austrália, Canadá...).
-const FOREIGN_LETTERS: Record<string, AgeRating> = { U: 0, G: 0, TP: 0, AL: 0, ALL: 0, E: 0, PG: 10, M: 14 };
+// "M" (Austrália/Nova Zelândia) é para maiores de 15; "E" (isento) não diz nada sobre o conteúdo.
+const FOREIGN_LETTERS: Record<string, AgeRating> = { U: 0, G: 0, TP: 0, AL: 0, ALL: 0, PG: 10, M: 16 };
 
 /**
  * Classificação de outro país convertida para o ClassInd, arredondando para cima: "15" ou "MA15+"

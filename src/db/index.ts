@@ -35,19 +35,26 @@ if (shared.__olweMigration?.key !== migrationKey) {
   shared.__olweMigration = {
     key: migrationKey,
     // Outro processo (outro worker do build, outra instância) pode estar migrando o mesmo banco: tenta
-    // de novo depois de uma pausa; a segunda tentativa só aplica o que ainda faltar.
+    // de novo algumas vezes, com pausas crescentes; cada tentativa só aplica o que ainda faltar.
     done: previous
-      .then(() => migrate(db, { migrationsFolder }))
-      .catch(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 1500));
-        await migrate(db, { migrationsFolder });
-      })
+      .then(() => migrateWithRetry(3))
       .catch((err) => {
         console.error("[db] falha ao aplicar migrações", err);
       }),
   };
 }
 await shared.__olweMigration.done;
+
+async function migrateWithRetry(retries: number): Promise<void> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await migrate(db, { migrationsFolder });
+    } catch (err) {
+      if (attempt >= retries) throw err;
+      await new Promise((resolve) => setTimeout(resolve, 1000 * (attempt + 1) + Math.random() * 500));
+    }
+  }
+}
 
 function readMigrationKey() {
   try {

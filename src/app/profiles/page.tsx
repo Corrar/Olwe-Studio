@@ -9,6 +9,7 @@ import { profiles } from "@/db/schema";
 import { MAX_PROFILES } from "@/lib/avatars";
 import { clampLimit, limitLabel } from "@/lib/classification";
 import { requireUser } from "@/lib/dal";
+import { ForgetActiveProfile } from "./forget-active-profile";
 
 export const metadata: Metadata = { title: "Quem está assistindo?" };
 
@@ -18,6 +19,7 @@ export default async function ProfilesPage() {
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center gap-10 px-4 py-16">
+      <ForgetActiveProfile />
       <Logo href="/profiles" size={34} />
       <h1 className="font-display text-3xl font-semibold sm:text-4xl">Quem está assistindo?</h1>
       <ul className="flex flex-wrap justify-center gap-6">

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { logout } from "@/app/actions/auth";
+import { leaveProfile } from "@/app/actions/profiles";
 import type { Profile } from "@/db/schema";
 import { Avatar } from "./avatar";
 import { Logo } from "./logo";
@@ -20,9 +21,9 @@ export function Header({ profile }: { profile: Profile }) {
             </summary>
             <div className="absolute right-0 mt-2 w-52 overflow-hidden rounded-xl border border-line bg-surface shadow-2xl">
               <p className="border-b border-line px-4 py-3 text-sm font-semibold">{profile.name}</p>
-              <Link href="/profiles" className="block px-4 py-2.5 text-sm hover:bg-surface-2">
-                Trocar perfil
-              </Link>
+              <form action={leaveProfile}>
+                <button className="w-full px-4 py-2.5 text-left text-sm hover:bg-surface-2">Trocar perfil</button>
+              </form>
               <Link href="/account" className="block px-4 py-2.5 text-sm hover:bg-surface-2">
                 Conta
               </Link>

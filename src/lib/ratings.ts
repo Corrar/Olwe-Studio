@@ -21,14 +21,19 @@ export async function ratingOf(t: Title): Promise<RatingInfo | null> {
   if (t.ageRating) return t.ageRating;
   if (t.ratingUnconfirmed) return null;
   // Filme completo: usa a classificação do mesmo filme no TMDB, quando ele foi identificado.
+  // As listas recebem a sinopse cortada em 600 caracteres: a estimativa usa o mesmo trecho em toda página.
+  const estimate = estimateRating(t.genreIds, `${t.title} ${t.overview.slice(0, 600)}`);
   const tmdbId = t.type === "movie" || t.type === "tv" ? t.id : t.tmdbMatchId;
   if (tmdbId) {
     const result = await getTmdbRating(t.type === "tv" ? "tv" : "movie", tmdbId);
     if (result.status === "error") return null;
-    if (result.status === "found") return result.rating;
+    if (result.status === "found") {
+      // Classificação de outro país (estimada): os temas do título e da sinopse ainda podem subir a idade.
+      if (result.rating.source !== "estimada") return result.rating;
+      return { ...result.rating, value: Math.max(result.rating.value, estimate.value) as AgeRating };
+    }
   }
-  // As listas recebem a sinopse cortada em 600 caracteres: a estimativa usa o mesmo trecho em toda página.
-  return estimateRating(t.genreIds, `${t.title} ${t.overview.slice(0, 600)}`);
+  return estimate;
 }
 
 export async function withRatings<T extends Title>(items: T[]): Promise<T[]> {

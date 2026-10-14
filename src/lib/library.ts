@@ -1,5 +1,5 @@
 import "server-only";
-import { and, desc, eq, gt, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, lt, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { progress, watchlist } from "@/db/schema";
 import type { MediaType } from "./types";
@@ -27,7 +27,8 @@ export async function getContinueWatching(profileId: string) {
       eq(progress.profileId, profileId),
       inArray(progress.mediaType, ["archive", "commons"]),
       gt(progress.position, 0),
-      sql`${progress.duration} = 0 or ${progress.position} < ${progress.duration} * 0.95`,
+      // or() com parênteses próprios: um "or" solto no SQL escaparia do filtro por perfil.
+      or(eq(progress.duration, 0), lt(progress.position, sql`${progress.duration} * 0.95`)),
     ),
     orderBy: desc(progress.updatedAt),
     limit: 20,
