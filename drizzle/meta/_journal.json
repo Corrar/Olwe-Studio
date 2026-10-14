@@ -29,6 +29,13 @@
       "when": 1791939862137,
       "tag": "0003_profile_lock",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1791940095886,
+      "tag": "0004_email_verification",
+      "breakpoints": true
     }
   ]
 }

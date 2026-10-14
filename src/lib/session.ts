@@ -71,4 +71,18 @@ export async function getActiveProfileId(): Promise<string | null> {
   }
 }
 
+/** Token assinado de uso único por finalidade (ex.: link de confirmação de e-mail). */
+export async function signToken(purpose: string, claims: Record<string, string>, expiresIn: string) {
+  return new SignJWT({ ...claims, purpose }).setProtectedHeader({ alg: "HS256" }).setIssuedAt().setExpirationTime(expiresIn).sign(secretKey());
+}
+
+export async function readToken(purpose: string, token: string): Promise<Record<string, unknown> | null> {
+  try {
+    const { payload } = await jwtVerify(token, secretKey(), { algorithms: ["HS256"] });
+    return payload.purpose === purpose ? payload : null;
+  } catch {
+    return null;
+  }
+}
+
 export const SESSION_COOKIE_NAME = SESSION_COOKIE;

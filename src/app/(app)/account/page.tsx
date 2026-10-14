@@ -17,7 +17,10 @@ export default async function AccountPage() {
         </div>
         <div className="p-5">
           <p className="text-sm text-muted">E-mail</p>
-          <p>{user.email}</p>
+          <p className="flex flex-wrap items-center gap-2">
+            {user.email}
+            {user.emailVerifiedAt && <span className="rounded-full bg-amber/15 px-2 py-0.5 text-xs text-amber">✓ Confirmado</span>}
+          </p>
         </div>
         <div className="p-5">
           <p className="text-sm text-muted">Plano</p>

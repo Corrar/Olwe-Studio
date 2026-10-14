@@ -8,7 +8,7 @@ export default function SignupPage() {
   return (
     <div className="w-full max-w-sm rounded-3xl border border-line bg-ink/70 p-8 backdrop-blur">
       <h1 className="mb-2 font-display text-3xl font-semibold">Criar conta</h1>
-      <p className="mb-6 text-sm text-muted">Filmes e séries sem nenhum anúncio.</p>
+      <p className="mb-6 text-sm text-muted">Filmes e séries sem nenhum anúncio. Vamos confirmar seu e-mail com um link.</p>
       <AuthForm
         action={signup}
         submitLabel="Criar conta"

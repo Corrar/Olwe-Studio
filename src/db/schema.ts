@@ -11,6 +11,10 @@ export const users = sqliteTable(
     email: text("email").notNull(),
     name: text("name").notNull(),
     passwordHash: text("password_hash").notNull(),
+    /** Quando o e-mail foi confirmado pelo link enviado no cadastro (null = ainda não confirmado). */
+    emailVerifiedAt: integer("email_verified_at", { mode: "timestamp" }),
+    /** Último envio do e-mail de confirmação, para limitar reenvios. */
+    verificationSentAt: integer("verification_sent_at", { mode: "timestamp" }),
     createdAt: createdAt(),
   },
   (t) => [uniqueIndex("users_email_idx").on(t.email)],
