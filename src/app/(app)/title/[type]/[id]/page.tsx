@@ -30,6 +30,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const access = await accessFor(title, viewerOf(await requireProfile()));
   if (access.status === "removed") notFound();
   if (access.status === "blocked-for-profile") return { title: "Indisponível para este perfil" };
+  if (access.status === "unavailable") return { title: "Indisponível no momento" };
   return { title: title.title, description: title.overview.slice(0, 200) };
 }
 
@@ -84,6 +85,20 @@ export default async function TitlePage({ params }: Props) {
             Voltar ao início
           </Link>
         </div>
+      </div>
+    );
+  }
+  if (access.status === "unavailable") {
+    return (
+      <div className="mx-auto flex min-h-[70vh] max-w-lg flex-col items-center justify-center gap-5 px-4 pt-24 text-center">
+        <h1 className="font-display text-2xl font-semibold">Indisponível no momento</h1>
+        <p className="text-muted">
+          Não conseguimos confirmar a classificação indicativa deste título agora. Por segurança, ele só é exibido depois
+          dessa confirmação. Tente de novo em instantes.
+        </p>
+        <Link href="/browse" className="rounded-full bg-white/10 px-6 py-3 font-semibold hover:bg-white/20">
+          Voltar ao início
+        </Link>
       </div>
     );
   }

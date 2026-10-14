@@ -1,7 +1,7 @@
 import "server-only";
 import { MOVIE_GENRES, TV_GENRES } from "./genres";
 import { MOCK_TITLES, mockList } from "./mock-catalog";
-import { parseBrazilian, parseUs, type RatingInfo } from "./classification";
+import { estimateRating, isAdultsOnly, parseBrazilian, parseUs, type RatingInfo } from "./classification";
 import { isRecent, NEW_RELEASE_DAYS, type Title, type TitleDetails, type WatchProviders } from "./types";
 
 const API = "https://api.themoviedb.org/3";
@@ -13,7 +13,10 @@ export const isDemoCatalog = !process.env.TMDB_API_KEY;
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Raw = Record<string, any>;
 
-async function tmdb<T = Raw>(path: string, params: Record<string, string> = {}, revalidate = 3600): Promise<T | null> {
+type TmdbResult<T> = { ok: true; data: T } | { ok: false; notFound: boolean };
+
+/** Consulta ao TMDB que diferencia "não existe" (404) de falha (rede, tempo esgotado, limite, erro). */
+async function tmdbResult<T = Raw>(path: string, params: Record<string, string> = {}, revalidate = 3600): Promise<TmdbResult<T>> {
   const key = process.env.TMDB_API_KEY!;
   const url = new URL(API + path);
   url.searchParams.set("language", LANGUAGE);
@@ -24,15 +27,28 @@ async function tmdb<T = Raw>(path: string, params: Record<string, string> = {}, 
   if (key.startsWith("eyJ")) headers.authorization = `Bearer ${key}`;
   else url.searchParams.set("api_key", key);
 
-  try {
-    const res = await fetch(url, { headers, next: { revalidate }, signal: AbortSignal.timeout(10_000) });
-    if (res.status === 404) return null;
-    if (!res.ok) throw new Error(`TMDB ${res.status} em ${path}`);
-    return (await res.json()) as T;
-  } catch (err) {
-    console.error("[tmdb]", err);
-    return null;
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const res = await fetch(url, { headers, next: { revalidate }, signal: AbortSignal.timeout(10_000) });
+      if (res.status === 404) return { ok: false, notFound: true };
+      // Limite de requisições ou instabilidade: tenta mais uma vez depois de uma pausa curta.
+      if ((res.status === 429 || res.status >= 500) && attempt === 0) {
+        const wait = Math.min(Number(res.headers.get("retry-after")) || 1, 2);
+        await new Promise((resolve) => setTimeout(resolve, wait * 1000));
+        continue;
+      }
+      if (!res.ok) throw new Error(`TMDB ${res.status} em ${path}`);
+      return { ok: true, data: (await res.json()) as T };
+    } catch (err) {
+      console.error("[tmdb]", err);
+      return { ok: false, notFound: false };
+    }
   }
+}
+
+async function tmdb<T = Raw>(path: string, params: Record<string, string> = {}, revalidate = 3600): Promise<T | null> {
+  const result = await tmdbResult<T>(path, params, revalidate);
+  return result.ok ? result.data : null;
 }
 
 export type TmdbType = "movie" | "tv";
@@ -130,7 +146,8 @@ export async function getTitle(type: TmdbType, id: string): Promise<TitleDetails
     videos.find((v) => v.site === "YouTube" && v.type === "Trailer") ??
     videos.find((v) => v.site === "YouTube" && v.type === "Teaser");
 
-  const ageRating = ratingFromRaw(type, raw);
+  // Sem classificação em nenhum país, vale a estimativa (que considera gêneros, título e sinopse).
+  const ageRating = ratingFromRaw(type, raw) ?? estimateRating(base.genreIds, `${base.title} ${base.overview}`);
   const certification = ageRating && ageRating.source === "oficial" ? (ageRating.value === 0 ? "L" : String(ageRating.value)) : null;
 
   return {
@@ -184,40 +201,51 @@ function toProviders(region: Raw | undefined): WatchProviders | null {
 
 /**
  * Classificação a partir de release_dates (filmes) ou content_ratings (séries) do TMDB:
- * a brasileira (oficial) ou, sem ela, a americana convertida (equivalente).
+ * a brasileira (oficial); sem ela, 18 se algum país classificar como só para adultos; senão a
+ * americana convertida (equivalente). Null quando nenhum país informa classificação.
  */
 function ratingFromRaw(type: TmdbType, raw: Raw): RatingInfo | null {
-  type Entry = { cert: string; descriptors: string[] };
-  const entries = (country: string): Entry[] => {
-    if (type === "movie") {
-      const r = (raw.release_dates?.results ?? []).find((x: Raw) => x.iso_3166_1 === country);
-      return (r?.release_dates ?? [])
-        .filter((d: Raw) => d.certification)
-        .map((d: Raw) => ({ cert: String(d.certification), descriptors: (d.descriptors ?? []).map(String) }));
-    }
-    const r = (raw.content_ratings?.results ?? []).find((x: Raw) => x.iso_3166_1 === country);
-    return r?.rating ? [{ cert: String(r.rating), descriptors: (r.descriptors ?? []).map(String) }] : [];
-  };
+  type Entry = { country: string; cert: string; descriptors: string[] };
+  const all: Entry[] =
+    type === "movie"
+      ? (raw.release_dates?.results ?? []).flatMap((r: Raw) =>
+          (r.release_dates ?? [])
+            .filter((d: Raw) => d.certification)
+            .map((d: Raw) => ({ country: r.iso_3166_1, cert: String(d.certification), descriptors: (d.descriptors ?? []).map(String) })),
+        )
+      : (raw.content_ratings?.results ?? [])
+          .filter((r: Raw) => r.rating)
+          .map((r: Raw) => ({ country: r.iso_3166_1, cert: String(r.rating), descriptors: (r.descriptors ?? []).map(String) }));
   // Entre várias datas de lançamento, vale a classificação mais alta.
-  const pick = (list: Entry[], parse: (c: string) => RatingInfo["value"] | null) =>
-    list
+  const pick = (country: string, parse: (c: string) => RatingInfo["value"] | null) =>
+    all
+      .filter((e) => e.country === country)
       .map((e) => ({ value: parse(e.cert), descriptors: e.descriptors }))
       .filter((e): e is { value: RatingInfo["value"]; descriptors: string[] } => e.value !== null)
       .sort((a, b) => b.value - a.value)[0];
 
-  const br = pick(entries(REGION), parseBrazilian);
+  const br = pick(REGION, parseBrazilian);
   if (br) return { value: br.value, source: "oficial", descriptors: br.descriptors };
-  const us = pick(entries("US"), parseUs);
+  if (all.some((e) => isAdultsOnly(e.cert, e.country))) return { value: 18, source: "equivalente", descriptors: [] };
+  const us = pick("US", parseUs);
   if (us) return { value: us.value, source: "equivalente", descriptors: [] };
   return null;
 }
 
+/** found = classificado; none = nenhum país informa; error = não deu para consultar agora. */
+export type RatingLookup = { status: "found"; rating: RatingInfo } | { status: "none" } | { status: "error" };
+
 /** Só a classificação de um título (consulta leve, guardada por 7 dias). */
-export async function getTmdbRating(type: TmdbType, id: string | number): Promise<RatingInfo | null> {
-  if (isDemoCatalog) return mockRating(MOCK_TITLES.find((m) => m.type === type && m.id === String(id))?.certification);
+export async function getTmdbRating(type: TmdbType, id: string | number): Promise<RatingLookup> {
+  if (isDemoCatalog) {
+    const rating = mockRating(MOCK_TITLES.find((m) => m.type === type && m.id === String(id))?.certification);
+    return rating ? { status: "found", rating } : { status: "none" };
+  }
   const path = type === "movie" ? `/movie/${id}/release_dates` : `/tv/${id}/content_ratings`;
-  const data = await tmdb(path, {}, 60 * 60 * 24 * 7);
-  return data ? ratingFromRaw(type, type === "movie" ? { release_dates: data } : { content_ratings: data }) : null;
+  const result = await tmdbResult(path, {}, 60 * 60 * 24 * 7);
+  if (!result.ok) return result.notFound ? { status: "none" } : { status: "error" };
+  const rating = ratingFromRaw(type, type === "movie" ? { release_dates: result.data } : { content_ratings: result.data });
+  return rating ? { status: "found", rating } : { status: "none" };
 }
 
 function mockRating(cert: string | null | undefined): RatingInfo | null {
@@ -225,7 +253,15 @@ function mockRating(cert: string | null | undefined): RatingInfo | null {
   return value === null ? null : { value, source: "oficial", descriptors: [] };
 }
 
-export type ArtworkMatch = { id: number; poster: string | null; backdrop: string | null; overview: string };
+export type ArtworkMatch = {
+  id: number;
+  poster: string | null;
+  backdrop: string | null;
+  overview: string;
+  genreIds: number[];
+  /** O mesmo filme está marcado como adulto no TMDB: fica fora do catálogo. */
+  adult: boolean;
+};
 
 function normalize(text: string) {
   return text
@@ -243,7 +279,8 @@ function normalize(text: string) {
  */
 export async function findMovieArtwork(title: string, year: string): Promise<ArtworkMatch | null> {
   if (isDemoCatalog || !title) return null;
-  const data = await tmdb("/search/movie", { query: title, include_adult: "false" }, 60 * 60 * 24 * 7);
+  // Inclui resultados adultos para identificar (e tirar do catálogo) filmes livres que são adultos.
+  const data = await tmdb("/search/movie", { query: title, include_adult: "true" }, 60 * 60 * 24 * 7);
   const wanted = normalize(title);
   const target = Number(year);
   const match = (data?.results ?? []).find((r: Raw) => {
@@ -251,12 +288,14 @@ export async function findMovieArtwork(title: string, year: string): Promise<Art
     const names = [r.title, r.original_title].filter(Boolean).map((n: string) => normalize(n));
     return r.poster_path && released && Math.abs(released - target) <= 1 && names.includes(wanted);
   });
-  if (!match || match.adult) return null;
+  if (!match) return null;
   return {
     id: match.id,
     poster: imageUrl(match.poster_path, "w500"),
     backdrop: imageUrl(match.backdrop_path, "w1280"),
     overview: match.overview ?? "",
+    genreIds: match.genre_ids ?? [],
+    adult: match.adult === true,
   };
 }
 

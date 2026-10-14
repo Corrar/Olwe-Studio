@@ -75,22 +75,40 @@ export function parseUs(cert: unknown): AgeRating | null {
   return c in US_EQUIVALENTS ? US_EQUIVALENTS[c] : null;
 }
 
-// Gêneros do TMDB que pedem estimativa mais alta.
-const MATURE_GENRES = new Set([27, 53, 80, 10752, 10768]); // terror, suspense, crime, guerra, guerra e política
-
 /**
- * Estimativa conservadora para títulos sem classificação oficial nem equivalente:
- * 16 para terror, suspense, crime e guerra; 12 para o resto. Títulos estimados nunca aparecem
- * em perfis infantis.
+ * Classificações de qualquer país que significam "só para adultos": 18, -18, 18+, R18+, R-18, VM18,
+ * 19 (Coreia), R21, X, NC-17, "Restricted Screening" (Coreia), "A" (Índia), "C"/"D" (México) e "III" (Hong Kong).
+ * 14A/18A do Canadá só exigem acompanhante e não contam.
  */
-export function estimateRating(genreIds: number[] = [], text = ""): RatingInfo {
-  const mature = genreIds.some((g) => MATURE_GENRES.has(g)) || /\b(horror|terror|thriller|crime|noir|war|guerra|zombie|zumbi)\b/i.test(text);
-  return { value: mature ? 16 : 12, source: "estimada", descriptors: [] };
+export function isAdultsOnly(cert: unknown, country = ""): boolean {
+  const c = String(cert ?? "").trim().toUpperCase();
+  if (!c) return false;
+  if (/^(X|XX|XXX|AO|NC-17|RESTRICTED SCREENING)$/.test(c)) return true;
+  if ((country === "IN" && c === "A") || (country === "HK" && c === "III") || (country === "MX" && /^[CD]$/.test(c))) return true;
+  if (/^\d{2}A$/.test(c)) return false;
+  return Number(c.match(/(?<!\d)\d{2}(?!\d)/)?.[0]) >= 18;
 }
 
-/** Temas adultos no título, assuntos ou descrição de filmes das fontes livres: ficam fora do catálogo. */
+/** Temas adultos no título, assuntos ou descrição: o título fica fora do catálogo. */
 export const ADULT_CONTENT =
-  /\b(sex|sexual|sexo|erotic|erotica|erótico|porn|porno|pornographic|pornografia|xxx|nude|nudes|nudity|nudez|naked|stag film|sexploitation|striptease|burlesque|adults? only|adult film|adult movie|hentai)\b|18\+/i;
+  /\b(sex|sexual|sexy|sexo|erotic\w*|erótic\w*|erotismo|porn\w*|xxx|nude|nudes|nudity|nudez|nudist\w*|nudie\w*|naked|topless|softcore|stag film|sexploitation|strip-?tease|burlesque|adults? only|adult film|adult movie|hentai)\b|18\+/i;
+
+// Gêneros do TMDB que pedem estimativa mais alta: terror, suspense, crime, mistério (onde ficam as
+// séries de terror, que não têm o gênero 27), guerra e guerra e política.
+const MATURE_GENRES = new Set([27, 53, 80, 9648, 10752, 10768]);
+const MATURE_TEXT =
+  /\b(horror|terror|thriller|crime|noir|war|guerra|zombies?|zumbis?|murder\w*|assassin\w*|serial killer|slasher|vampir\w*|demons?|demonic|demônios?|gore)\b/i;
+
+/**
+ * Estimativa conservadora para títulos sem classificação em nenhum país: 18 (fica fora) quando o
+ * título ou a sinopse falam de temas adultos, 16 para terror, suspense, crime e guerra, 12 para o
+ * resto. Títulos estimados nunca aparecem em perfis infantis.
+ */
+export function estimateRating(genreIds: number[] = [], text = ""): RatingInfo {
+  if (ADULT_CONTENT.test(text)) return { value: 18, source: "estimada", descriptors: [] };
+  const mature = genreIds.some((g) => MATURE_GENRES.has(g)) || MATURE_TEXT.test(text);
+  return { value: mature ? 16 : 12, source: "estimada", descriptors: [] };
+}
 
 /** Regra de visibilidade de um título para um perfil, no estilo Netflix/Prime Video. */
 export function isAllowed(rating: RatingInfo | null | undefined, profileLimit: number, isKids: boolean): boolean {

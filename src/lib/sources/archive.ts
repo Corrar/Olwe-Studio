@@ -44,6 +44,27 @@ function yearOf(raw: Raw) {
   return match ? match[0] : null;
 }
 
+// Assuntos do Internet Archive que indicam o gênero (ids do TMDB). O gênero entra na estimativa de
+// classificação dos filmes sem classificação oficial, e é o mesmo em qualquer página do site.
+const SUBJECT_GENRES: [RegExp, number][] = [
+  [/\bhorror\b/i, 27],
+  [/\b(thriller|suspense)\b/i, 53],
+  [/\b(crime|noir|gangsters?|detective)\b/i, 80],
+  [/\b(war|world war)\b/i, 10752],
+  [/\bmystery\b/i, 9648],
+  [/\b(science fiction|sci-fi)\b/i, 878],
+  [/\bwesterns?\b/i, 37],
+  [/\bcomedy\b/i, 35],
+  [/\bdrama\b/i, 18],
+  [/\badventure\b/i, 12],
+  [/\b(animation|cartoons?)\b/i, 16],
+];
+
+function genresOf(subjects: string[]) {
+  const text = subjects.join(" ");
+  return SUBJECT_GENRES.filter(([pattern]) => pattern.test(text)).map(([, id]) => id);
+}
+
 const thumb = (id: string) => `https://archive.org/services/img/${encodeURIComponent(id)}`;
 const downloadUrl = (id: string, name: string) =>
   `https://archive.org/download/${encodeURIComponent(id)}/${name.split("/").map(encodeURIComponent).join("/")}`;
@@ -96,14 +117,16 @@ export async function getArchiveDetails(id: string): Promise<TitleDetails | null
   const video = pickVideos(id, files);
   const title = stripHtml(first(meta.title));
   if (!title) return null;
-  const subjects = (Array.isArray(meta.subject) ? meta.subject : String(meta.subject ?? "").split(/[;,]/))
-    .map((s: string) => s.trim())
-    .filter(Boolean)
-    .slice(0, 4);
+  const subjects: string[] = (Array.isArray(meta.subject) ? meta.subject : String(meta.subject ?? "").split(/[;,]/))
+    .map((s: unknown) => String(s).trim())
+    .filter(Boolean);
   const creator = stripHtml(first(meta.creator));
-  const description = stripHtml(first(meta.description));
-  // Conteúdo adulto fica fora do catálogo.
-  if (ADULT_CONTENT.test(`${title} ${subjects.join(" ")} ${description}`)) return null;
+  const descriptions = (Array.isArray(meta.description) ? meta.description : [meta.description]).map((d: unknown) =>
+    stripHtml(String(d ?? "")),
+  );
+  const description = descriptions[0] ?? "";
+  // Conteúdo adulto fica fora do catálogo: confere todos os assuntos e todas as descrições.
+  if (ADULT_CONTENT.test(`${title} ${subjects.join(" ")} ${descriptions.join(" ")}`)) return null;
 
   return {
     id,
@@ -114,11 +137,11 @@ export async function getArchiveDetails(id: string): Promise<TitleDetails | null
     backdrop: thumb(id),
     year: yearOf(meta),
     rating: 0,
-    genreIds: [],
+    genreIds: genresOf(subjects),
     quality: qualityOf(video.width, video.height),
     isNew: isRecent(first(meta.publicdate) || first(meta.addeddate), NEW_ADDITION_DAYS),
     tagline: null,
-    genres: subjects.map((name: string, i: number) => ({ id: i, name })),
+    genres: subjects.slice(0, 4).map((name, i) => ({ id: i, name })),
     runtime: parseRuntime(first(meta.runtime), files),
     seasons: [],
     cast: [],

@@ -21,7 +21,7 @@ export default async function WatchPage({ params }: PageProps<"/watch/[type]/[id
 
   const access = await accessFor(title, viewerOf(profile));
   if (access.status === "removed") notFound();
-  if (access.status === "blocked-for-profile") redirect(`/title/${title.type}/${encodeURIComponent(title.id)}`);
+  if (access.status !== "allowed") redirect(`/title/${title.type}/${encodeURIComponent(title.id)}`);
 
   const full = isFullMovie(title);
   const progress = full ? await getProgress(profile.id, title.type, title.id) : null;
