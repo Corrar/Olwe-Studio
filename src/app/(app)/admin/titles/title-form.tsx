@@ -1,10 +1,11 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useRef } from "react";
 import { useFormStatus } from "react-dom";
 import { deleteLicensedTitle, saveLicensedTitle } from "@/app/actions/licensed";
 import { Icon } from "@/components/icons";
 import { FIELD, useManualSubmit } from "@/app/profiles/[id]/edit/form-kit";
+import { MuxUploader } from "./mux-uploader";
 
 /** Valores do formulário (texto, como nos campos). */
 export type TitleFormValues = {
@@ -76,11 +77,12 @@ function SaveButton() {
   );
 }
 
-export function TitleForm({ values, genres }: { values: TitleFormValues; genres: [number, string][] }) {
+export function TitleForm({ values, genres, mux }: { values: TitleFormValues; genres: [number, string][]; mux: boolean }) {
   const [state, action] = useActionState(saveLicensedTitle, undefined);
+  const videoRef = useRef<HTMLInputElement>(null);
   const onSubmit = useManualSubmit(action);
   const err = (name: string) => (state?.field === name ? state.error : undefined);
-  const input = (name: keyof TitleFormValues, props: React.InputHTMLAttributes<HTMLInputElement> = {}) => (
+  const input = (name: keyof TitleFormValues, props: React.InputHTMLAttributes<HTMLInputElement> & { ref?: React.Ref<HTMLInputElement> } = {}) => (
     <input id={name} name={name} defaultValue={String(values[name] ?? "")} className={FIELD} aria-invalid={state?.field === name || undefined} {...props} />
   );
 
@@ -134,12 +136,19 @@ export function TitleForm({ values, genres }: { values: TitleFormValues; genres:
         <Field
           name="video"
           label="Link do vídeo *"
-          hint="Vídeo oficial no YouTube (do dono dos direitos) ou arquivo MP4/WebM em HTTPS. Arquivos próprios passam com o anúncio do Olwe Grátis."
+          hint={`Vídeo oficial no YouTube (do dono dos direitos) ou arquivo MP4, WebM ou HLS (.m3u8) em HTTPS${mux ? ", ou envie o arquivo para o Mux abaixo" : ""}. Os vídeos fora do YouTube passam com o anúncio do Olwe Grátis.`}
           error={err("video")}
         >
-          {input("video", { required: true, maxLength: 1000 })}
+          {input("video", { required: true, maxLength: 1000, ref: videoRef })}
         </Field>
-        <Field name="videoHeight" label="Qualidade do arquivo" hint="Só para arquivos próprios.">
+        {mux && (
+          <MuxUploader
+            onReady={(assetId) => {
+              if (videoRef.current) videoRef.current.value = `mux:${assetId}`;
+            }}
+          />
+        )}
+        <Field name="videoHeight" label="Qualidade do arquivo" hint="Só para arquivos próprios. No Mux, em branco usa a do vídeo enviado.">
           <select id="videoHeight" name="videoHeight" defaultValue={values.videoHeight} className={FIELD}>
             <option value="">Não informar</option>
             <option value="2160">4K (2160p)</option>

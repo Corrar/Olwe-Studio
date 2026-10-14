@@ -16,8 +16,12 @@ banco libSQL/SQLite via Drizzle ORM e dois catálogos:
 Filmes com licença própria do Olwe (contrato com distribuidora, autorização do autor ou licença aberta),
 cadastrados no painel **`/admin/titles`**, aberto só para as contas de `ADMIN_EMAILS` (num perfil adulto).
 
-- Vídeo por **link oficial do YouTube** (do dono dos direitos) ou **arquivo MP4/WebM** em HTTPS. Os arquivos
-  tocam no player do Olwe, com o anúncio do Olwe Grátis antes.
+- Vídeo por **link oficial do YouTube** (do dono dos direitos), **arquivo MP4/WebM** ou **HLS (.m3u8)** em
+  HTTPS, ou **envio direto para o Mux** pelo próprio painel. Fora do YouTube, tocam no player do Olwe, com o
+  anúncio do Olwe Grátis antes. O HLS toca nativo no Safari/iPhone e pelo hls.js nos outros navegadores.
+- **Mux**: o arquivo vai do navegador direto para o Mux, em partes (retoma se a rede oscilar); o painel espera
+  o vídeo ficar pronto e preenche duração e qualidade. Com chave de assinatura, os vídeos ficam privados e o
+  player recebe links que vencem em 6 horas. Trocar o vídeo ou excluir o filme apaga o vídeo antigo no Mux.
 - **Janela da licença** (início e último dia): fora dela o filme some sozinho do app. O painel avisa as
   licenças que vencem nos próximos 30 dias.
 - **Plano**: Grátis + Premium, ou **só Premium** (exclusivo para assinantes).
@@ -71,6 +75,9 @@ testar tudo sem chave. Crie a chave grátis em <https://www.themoviedb.org/setti
 | `MERCADOPAGO_WEBHOOK_SECRET` | Assinatura secreta dos webhooks do Mercado Pago (recomendada). |
 | `PREMIUM_PRICE` | Preço mensal do Premium em reais (padrão `9.90`). |
 | `AD_TAG_URL` | Tag VAST da rede de anúncios (HTTPS). Vazio = sem anúncios. |
+| `MUX_TOKEN_ID` / `MUX_TOKEN_SECRET` | Access Token do Mux (Mux Video, leitura e escrita). Vazio = sem envio ao Mux. |
+| `MUX_SIGNING_KEY_ID` / `MUX_SIGNING_KEY_PRIVATE` | Chave de assinatura do Mux: vídeos privados com links temporários. |
+| `MUX_VIDEO_QUALITY` | `basic` (padrão) ou `plus`. |
 | `ADMIN_EMAILS` | E-mails (separados por vírgula) que abrem o painel do catálogo licenciado. |
 
 ## Deploy (Vercel + Turso)

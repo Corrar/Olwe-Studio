@@ -2,10 +2,15 @@
 
 const YOUTUBE_ID = /^[\w-]{11}$/;
 
-/** Link colado no painel: vídeo do YouTube (ID) ou arquivo próprio em HTTPS (MP4/WebM). */
-export function parseVideoLink(raw: string): { kind: "youtube" | "file"; value: string } | { error: string } {
+/**
+ * Link colado no painel: vídeo do YouTube (ID), vídeo enviado ao Mux ("mux:<asset id>", preenchido pelo
+ * envio do painel) ou arquivo próprio em HTTPS (MP4, WebM ou HLS .m3u8).
+ */
+export function parseVideoLink(raw: string): { kind: "youtube" | "file" | "mux"; value: string } | { error: string } {
   const text = raw.trim();
   if (YOUTUBE_ID.test(text)) return { kind: "youtube", value: text };
+  const mux = text.match(/^mux:([\w-]{1,100})$/);
+  if (mux) return { kind: "mux", value: mux[1] };
   let url: URL;
   try {
     url = new URL(text);
@@ -18,6 +23,5 @@ export function parseVideoLink(raw: string): { kind: "youtube" | "file"; value: 
     return YOUTUBE_ID.test(id) ? { kind: "youtube", value: id } : { error: "Não reconheci o vídeo nesse link do YouTube." };
   }
   if (url.protocol !== "https:") return { error: "O arquivo de vídeo precisa estar num endereço HTTPS." };
-  if (/\.m3u8$/i.test(url.pathname)) return { error: "Vídeos HLS (.m3u8) ainda não são suportados. Use MP4 ou WebM." };
   return { kind: "file", value: url.toString() };
 }

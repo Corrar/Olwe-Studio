@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { PAGE_TOP } from "@/components/catalog-page";
 import { requireAdmin } from "@/lib/admin";
+import { muxEnabled } from "@/lib/mux";
 import { TitleForm } from "../title-form";
 import { EMPTY_VALUES, GENRE_OPTIONS } from "../values";
 
@@ -15,7 +16,7 @@ export default async function NewLicensedTitlePage() {
         ← Catálogo licenciado
       </Link>
       <h1 className="mb-6 mt-1 font-display text-3xl font-bold tracking-tight">Novo filme</h1>
-      <TitleForm values={EMPTY_VALUES} genres={GENRE_OPTIONS} />
+      <TitleForm values={EMPTY_VALUES} genres={GENRE_OPTIONS} mux={muxEnabled()} />
     </div>
   );
 }

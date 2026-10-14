@@ -8,6 +8,7 @@ import { RatingBadge } from "@/components/rating-badge";
 import { getTitle } from "@/lib/catalog";
 import { adTagFor } from "@/lib/ads";
 import { isPremium } from "@/lib/billing";
+import { playableSources } from "@/lib/licensed";
 import { requireProfile, requireUser } from "@/lib/dal";
 import { getProgress } from "@/lib/library";
 import { accessFor, viewerOf } from "@/lib/ratings";
@@ -37,9 +38,10 @@ export default async function WatchPage({ params }: PageProps<"/watch/[type]/[id
   // Filme completo (Commons / Internet Archive) > vídeo próprio (DEMO_VIDEO_URL) > trailer do TMDB.
   const demoUrl = process.env.DEMO_VIDEO_URL;
   // Filme licenciado publicado no YouTube pelo dono dos direitos: toca no player do YouTube.
+  const videoSources = full ? await playableSources(title) : [];
   const source = full
-    ? title.videoSources.length
-      ? ({ kind: "files", files: title.videoSources.map(({ src, type, height }) => ({ src, type, height })) } as const)
+    ? videoSources.length
+      ? ({ kind: "files", files: videoSources.map(({ src, type, height }) => ({ src, type, height })) } as const)
       : title.youtubeKey
         ? ({ kind: "youtube", key: title.youtubeKey } as const)
         : null

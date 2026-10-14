@@ -134,10 +134,17 @@ export const licensedTitles = sqliteTable("licensed_titles", {
   ageRating: integer("age_rating").notNull(),
   /** Motivos da classificação separados por vírgula ("Violência, Drogas"). */
   ratingDescriptors: text("rating_descriptors").notNull().default(""),
-  /** file = arquivo de vídeo (MP4/WebM) tocado no player do Olwe; youtube = vídeo oficial no YouTube. */
-  videoKind: text("video_kind", { enum: ["file", "youtube"] }).notNull(),
-  /** URL do arquivo ou ID do vídeo no YouTube. */
+  /**
+   * file = arquivo de vídeo (MP4, WebM ou HLS) tocado no player do Olwe; youtube = vídeo oficial no
+   * YouTube; mux = vídeo enviado ao Mux (HLS adaptativo), também no player do Olwe.
+   */
+  videoKind: text("video_kind", { enum: ["file", "youtube", "mux"] }).notNull(),
+  /** URL do arquivo, ID do vídeo no YouTube ou playback ID do Mux. */
   videoUrl: text("video_url").notNull(),
+  /** Vídeo (asset) no Mux, para apagar junto com o filme. */
+  muxAssetId: text("mux_asset_id"),
+  /** Playback assinado no Mux: o player recebe um link temporário. */
+  muxSigned: integer("mux_signed", { mode: "boolean" }).notNull().default(false),
   /** Altura do vídeo em pixels (rótulo de qualidade). */
   videoHeight: integer("video_height"),
   /** free = Olwe Grátis (com anúncio antes) e Premium; premium = só assinantes. */

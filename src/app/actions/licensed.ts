@@ -9,6 +9,8 @@ import { licensedTitles } from "@/db/schema";
 import { requireAdmin } from "@/lib/admin";
 import { MOVIE_GENRES } from "@/lib/genres";
 import { getTitle as getTmdbTitle, isDemoCatalog } from "@/lib/tmdb";
+import { createDirectUpload, deleteAsset, getAsset, muxEnabled, uploadState, type UploadState } from "@/lib/mux";
+import { siteUrl } from "@/lib/verification";
 import { parseVideoLink } from "@/lib/video-link";
 import type { FormState } from "./auth";
 
@@ -79,6 +81,18 @@ export async function saveLicensedTitle(_: FormState, formData: FormData): Promi
   const video = parseVideoLink(field("video"));
   if ("error" in video) return { error: video.error, field: "video" };
 
+  // Vídeo enviado ao Mux: confere o asset e guarda o playback ID, a qualidade e a duração dele.
+  let mux: { assetId: string; signed: boolean; height: number | null; minutes: number | null } | null = null;
+  let videoUrl = video.value;
+  if (video.kind === "mux") {
+    const asset = muxEnabled() ? await getAsset(video.value) : null;
+    if (!asset || asset.status === "errored" || !asset.playbackId) {
+      return { error: "Não encontrei esse vídeo no Mux (ou ele falhou ao processar). Envie o arquivo de novo.", field: "video" };
+    }
+    mux = { assetId: asset.id, signed: asset.signed, height: asset.height, minutes: asset.minutes };
+    videoUrl = asset.playbackId;
+  }
+
   const genreIds = formData
     .getAll("genres")
     .map(Number)
@@ -101,7 +115,7 @@ export async function saveLicensedTitle(_: FormState, formData: FormData): Promi
     originalTitle: data.originalTitle ?? fromTmdb?.originalTitle ?? null,
     overview: data.overview || fromTmdb?.overview || "",
     year: data.year ?? fromTmdb?.year ?? null,
-    runtime: data.runtime ?? fromTmdb?.runtime ?? null,
+    runtime: data.runtime ?? fromTmdb?.runtime ?? mux?.minutes ?? null,
     genreIds: JSON.stringify(genreIds.length ? genreIds : (fromTmdb?.genreIds ?? []).filter((g) => MOVIE_GENRES[g])),
     poster: data.poster ?? fromTmdb?.poster ?? null,
     backdrop: data.backdrop ?? fromTmdb?.backdrop ?? null,
@@ -109,8 +123,10 @@ export async function saveLicensedTitle(_: FormState, formData: FormData): Promi
     ageRating: data.ageRating,
     ratingDescriptors: data.ratingDescriptors,
     videoKind: video.kind,
-    videoUrl: video.value,
-    videoHeight: video.kind === "file" ? data.videoHeight : null,
+    videoUrl,
+    videoHeight: video.kind === "file" ? data.videoHeight : video.kind === "mux" ? (data.videoHeight ?? mux?.height ?? null) : null,
+    muxAssetId: mux?.assetId ?? null,
+    muxSigned: mux?.signed ?? false,
     tier: data.tier,
     licensor: data.licensor,
     licenseName: data.licenseName,
@@ -124,8 +140,11 @@ export async function saveLicensedTitle(_: FormState, formData: FormData): Promi
 
   const id = field("id");
   if (id) {
-    const updated = await db.update(licensedTitles).set(values).where(eq(licensedTitles.id, id)).returning({ id: licensedTitles.id });
-    if (updated.length === 0) return { error: "Este filme não existe mais." };
+    const before = await db.query.licensedTitles.findFirst({ where: eq(licensedTitles.id, id), columns: { muxAssetId: true } });
+    if (!before) return { error: "Este filme não existe mais." };
+    await db.update(licensedTitles).set(values).where(eq(licensedTitles.id, id));
+    // Trocou o vídeo do Mux: o anterior deixa de ocupar espaço (e de ser cobrado) lá.
+    if (before.muxAssetId && before.muxAssetId !== values.muxAssetId) await deleteUnusedAsset(before.muxAssetId);
   } else {
     await db.insert(licensedTitles).values({ id: crypto.randomUUID(), ...values });
   }
@@ -136,9 +155,41 @@ export async function saveLicensedTitle(_: FormState, formData: FormData): Promi
 export async function deleteLicensedTitle(formData: FormData) {
   await requireAdmin();
   const id = String(formData.get("id") ?? "");
-  if (id) await db.delete(licensedTitles).where(eq(licensedTitles.id, id));
+  if (id) {
+    const [removed] = await db.delete(licensedTitles).where(eq(licensedTitles.id, id)).returning({ muxAssetId: licensedTitles.muxAssetId });
+    if (removed?.muxAssetId) await deleteUnusedAsset(removed.muxAssetId);
+  }
   revalidateCatalog();
   redirect("/admin/titles?deleted=1");
+}
+
+/** Apaga o vídeo no Mux se nenhum outro filme do catálogo usa o mesmo. */
+async function deleteUnusedAsset(assetId: string) {
+  const other = await db.query.licensedTitles.findFirst({ where: eq(licensedTitles.muxAssetId, assetId), columns: { id: true } });
+  if (!other) await deleteAsset(assetId);
+}
+
+/** Abre um envio direto ao Mux para o arquivo escolhido no painel. */
+export async function startMuxUpload(): Promise<{ id: string; url: string } | { error: string }> {
+  await requireAdmin();
+  if (!muxEnabled()) return { error: "O Mux não está configurado (MUX_TOKEN_ID e MUX_TOKEN_SECRET)." };
+  try {
+    return await createDirectUpload(await siteUrl());
+  } catch {
+    return { error: "Não foi possível abrir o envio para o Mux agora. Tente de novo." };
+  }
+}
+
+/** Andamento do vídeo no Mux depois do envio (o painel pergunta até ficar pronto). */
+export async function checkMuxUpload(uploadId: string): Promise<UploadState> {
+  await requireAdmin();
+  if (!muxEnabled() || typeof uploadId !== "string" || !/^[\w-]{1,100}$/.test(uploadId)) return { status: "error" };
+  try {
+    return await uploadState(uploadId);
+  } catch {
+    // Instabilidade: o painel pergunta de novo na próxima volta.
+    return { status: "uploading" };
+  }
 }
 
 function revalidateCatalog() {

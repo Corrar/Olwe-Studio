@@ -53,7 +53,12 @@ export function valuesOf(row: LicensedTitle): TitleFormValues {
     genres,
     ageRating: String(row.ageRating),
     ratingDescriptors: row.ratingDescriptors,
-    video: row.videoKind === "youtube" ? `https://www.youtube.com/watch?v=${row.videoUrl}` : row.videoUrl,
+    video:
+      row.videoKind === "youtube"
+        ? `https://www.youtube.com/watch?v=${row.videoUrl}`
+        : row.videoKind === "mux" && row.muxAssetId
+          ? `mux:${row.muxAssetId}`
+          : row.videoUrl,
     videoHeight: row.videoHeight ? String(row.videoHeight) : "",
     tier: row.tier,
     licensor: row.licensor,

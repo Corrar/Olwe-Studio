@@ -4,7 +4,8 @@ import { db } from "@/db";
 import { licensedTitles, type LicensedTitle } from "@/db/schema";
 import { isAgeRating } from "./classification";
 import { MOVIE_GENRES } from "./genres";
-import { isRecent, NEW_ADDITION_DAYS, qualityOf, type Title, type TitleDetails, type VideoSource } from "./types";
+import { playbackUrl } from "./mux";
+import { HLS_MIME, isRecent, NEW_ADDITION_DAYS, qualityOf, type Title, type TitleDetails, type VideoSource } from "./types";
 
 // Catálogo próprio do Olwe: filmes com licença cadastrada no painel. Só entram os publicados e dentro
 // da janela da licença, conferida a cada consulta (o filme some sozinho quando o contrato vence).
@@ -34,6 +35,7 @@ function parseGenres(json: string): number[] {
 /** MIME pela extensão do arquivo, para o navegador saber se consegue tocar. */
 export function videoMime(url: string) {
   const path = url.split(/[?#]/)[0].toLowerCase();
+  if (path.endsWith(".m3u8")) return HLS_MIME;
   if (path.endsWith(".webm")) return "video/webm";
   if (path.endsWith(".ogv") || path.endsWith(".ogg")) return "video/ogg";
   return "video/mp4";
@@ -52,7 +54,7 @@ function toTitle(row: LicensedTitle): Title {
     year: row.year,
     rating: 0,
     genreIds: parseGenres(row.genreIds),
-    quality: row.videoKind === "file" ? qualityOf(null, row.videoHeight) : null,
+    quality: row.videoKind === "youtube" ? null : qualityOf(null, row.videoHeight),
     isNew: isRecent(row.createdAt.toISOString(), NEW_ADDITION_DAYS),
     // Classificação do próprio Olwe (autoclassificação, como fazem os serviços de streaming no ClassInd).
     ageRating: {
@@ -69,8 +71,13 @@ function toTitle(row: LicensedTitle): Title {
 
 function toDetails(row: LicensedTitle, recommendations: Title[]): TitleDetails {
   const base = toTitle(row);
+  // Mux assinado: o endereço com token só é gerado no player (playableSources), nunca nas páginas.
   const videoSources: VideoSource[] =
-    row.videoKind === "file" ? [{ src: row.videoUrl, type: videoMime(row.videoUrl), height: row.videoHeight }] : [];
+    row.videoKind === "file"
+      ? [{ src: row.videoUrl, type: videoMime(row.videoUrl), height: row.videoHeight }]
+      : row.videoKind === "mux"
+        ? [{ src: `https://stream.mux.com/${row.videoUrl}.m3u8`, type: HLS_MIME, height: row.videoHeight }]
+        : [];
   return {
     ...base,
     tagline: null,
@@ -84,12 +91,20 @@ function toDetails(row: LicensedTitle, recommendations: Title[]): TitleDetails {
     providers: null,
     videoSources,
     youtubeKey: row.videoKind === "youtube" ? row.videoUrl : null,
+    signedPlaybackId: row.videoKind === "mux" && row.muxSigned ? row.videoUrl : null,
     sourceUrl: null,
     sourceName: row.licensor,
     license: null,
     licenseName: row.licenseName,
     credit: row.credit,
   };
+}
+
+/** Arquivos para o player: no Mux assinado, troca pelo endereço com token temporário. */
+export async function playableSources(title: TitleDetails): Promise<VideoSource[]> {
+  if (!title.signedPlaybackId) return title.videoSources;
+  const src = await playbackUrl(title.signedPlaybackId, true);
+  return src ? [{ src, type: HLS_MIME, height: title.videoSources[0]?.height ?? null }] : [];
 }
 
 /** Licenciados no ar, os mais recentes primeiro; tier filtra Grátis ou só Premium. */

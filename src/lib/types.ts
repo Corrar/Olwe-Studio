@@ -44,6 +44,9 @@ export interface Title {
 
 export type Quality = "4K" | "Full HD" | "HD" | "SD";
 
+/** MIME do HLS (streaming adaptativo: Mux, .m3u8). */
+export const HLS_MIME = "application/x-mpegurl";
+
 export interface VideoSource {
   src: string;
   /** MIME com codecs, para o navegador escolher o primeiro que consegue tocar. */
@@ -114,6 +117,8 @@ export interface TitleDetails extends Title {
   credit: string | null;
   /** Filme completo publicado no YouTube pelo dono dos direitos (tocado no player do YouTube). */
   youtubeKey?: string | null;
+  /** Vídeo no Mux com playback assinado: o player pede um link com token (ver playableSources). */
+  signedPlaybackId?: string | null;
 }
 
 export function isFullMovie(t: Pick<Title, "type">) {

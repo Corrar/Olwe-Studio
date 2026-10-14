@@ -16,7 +16,7 @@ import {
   type SyntheticEvent,
 } from "react";
 import type { RatingInfo } from "@/lib/classification";
-import type { MediaType } from "@/lib/types";
+import { HLS_MIME, type MediaType } from "@/lib/types";
 import { AdBreak } from "./ad-break";
 import { Icon, type IconName } from "./icons";
 import { RatingBadge } from "./rating-badge";
@@ -177,6 +177,10 @@ function playableQualities(files: readonly PlayerFile[]): Quality[] {
 }
 const NO_QUALITIES: Quality[] = [];
 
+// HLS (streaming adaptativo, como o do Mux): Safari e iPhone tocam direto; os outros navegadores usam o hls.js.
+const isHls = (f: PlayerFile) => f.type.toLowerCase() === HLS_MIME;
+const nativeHlsSnapshot = () => document.createElement("video").canPlayType("application/vnd.apple.mpegurl") !== "";
+
 const speedLabel = (rate: number) => (rate === 1 ? "Normal" : `${String(rate).replace(".", ",")}x`);
 
 function FilePlayer({
@@ -205,6 +209,10 @@ function FilePlayer({
   );
   const canPip = useSyncExternalStore(subscribeNothing, () => document.pictureInPictureEnabled === true, () => false);
   const qualities = useSyncExternalStore(subscribeNothing, () => playableQualities(files), () => NO_QUALITIES);
+  const hlsFile = files.find(isHls);
+  const nativeHls = useSyncExternalStore(subscribeNothing, nativeHlsSnapshot, () => false);
+  // Cada nova tentativa (botão de tentar de novo) recria o hls.js.
+  const [hlsAttempt, setHlsAttempt] = useState(0);
 
   // Com progresso salvo, pergunta antes de tocar (como a Netflix); senão começa sozinho.
   const [prompt, setPrompt] = useState(startAt > 0);
@@ -258,6 +266,35 @@ function FilePlayer({
       window.removeEventListener("pagehide", save);
     };
   }, [files, mediaType, itemId, trackProgress]);
+
+  // HLS fora do Safari: o hls.js alimenta o <video> (Media Source Extensions). Um erro fatal de mídia
+  // tenta se recuperar uma vez; depois disso, mostra o erro com o botão de tentar de novo.
+  const hlsSrc = hlsFile && !nativeHls ? hlsFile.src : null;
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !hlsSrc) return;
+    let hls: import("hls.js").default | null = null;
+    let cancelled = false;
+    let recovered = false;
+    import("hls.js").then(({ default: Hls }) => {
+      if (cancelled) return;
+      if (!Hls.isSupported()) return setFailed(true);
+      hls = new Hls({ capLevelToPlayerSize: true });
+      hls.on(Hls.Events.ERROR, (_, data) => {
+        if (!data.fatal) return;
+        if (data.type === Hls.ErrorTypes.MEDIA_ERROR && !recovered) {
+          recovered = true;
+          hls?.recoverMediaError();
+        } else setFailed(true);
+      });
+      hls.loadSource(hlsSrc);
+      hls.attachMedia(video);
+    });
+    return () => {
+      cancelled = true;
+      hls?.destroy();
+    };
+  }, [hlsSrc, hlsAttempt]);
 
   // Volume e mudo do último vídeo (só neste navegador).
   useEffect(() => {
@@ -549,7 +586,8 @@ function FilePlayer({
     // Recarregar volta o vídeo ao 0:00: guarda o ponto da falha para não perder (nem sobrescrever) o progresso.
     if (video.currentTime > 0) restore.current = { time: video.currentTime, play: true };
     video.autoplay = false;
-    video.load();
+    if (hlsSrc) setHlsAttempt((n) => n + 1);
+    else video.load();
   }
 
   const quality = qualities.find((q) => q.src === media.src);
@@ -588,9 +626,12 @@ function FilePlayer({
         className="absolute inset-0 size-full bg-black object-contain"
       >
         {/* O navegador toca a primeira versão que suporta (ex.: WebM VP9 1080p; senão a de reserva). */}
-        {files.map((f, i) => (
-          <source key={f.src} src={f.src} type={f.type} onError={i === files.length - 1 ? () => setFailed(true) : undefined} />
-        ))}
+        {/* HLS só vira <source> onde o navegador toca direto; nos outros, quem carrega é o hls.js. */}
+        {files
+          .filter((f) => !isHls(f) || nativeHls)
+          .map((f, i, list) => (
+            <source key={f.src} src={f.src} type={f.type} onError={i === list.length - 1 ? () => setFailed(true) : undefined} />
+          ))}
       </video>
 
       {/* Camada de cliques e toques sobre o vídeo. */}

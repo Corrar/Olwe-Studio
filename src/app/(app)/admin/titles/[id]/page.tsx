@@ -6,6 +6,7 @@ import { PAGE_TOP } from "@/components/catalog-page";
 import { db } from "@/db";
 import { licensedTitles } from "@/db/schema";
 import { requireAdmin } from "@/lib/admin";
+import { muxEnabled } from "@/lib/mux";
 import { DeleteTitleButton, TitleForm } from "../title-form";
 import { GENRE_OPTIONS, valuesOf } from "../values";
 
@@ -27,7 +28,7 @@ export default async function EditLicensedTitlePage({ params }: PageProps<"/admi
           Ver no app
         </Link>
       </div>
-      <TitleForm values={valuesOf(row)} genres={GENRE_OPTIONS} />
+      <TitleForm values={valuesOf(row)} genres={GENRE_OPTIONS} mux={muxEnabled()} />
       <div className="mt-10 border-t border-line pt-6">
         <DeleteTitleButton id={row.id} title={row.title} />
       </div>
