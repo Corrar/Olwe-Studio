@@ -77,16 +77,42 @@ export function parseUs(cert: unknown): AgeRating | null {
 
 /**
  * Classificações de qualquer país que significam "só para adultos": 18, -18, 18+, R18+, R-18, VM18,
- * 19 (Coreia), R21, X, NC-17, "Restricted Screening" (Coreia), "A" (Índia), "C"/"D" (México) e "III" (Hong Kong).
- * 14A/18A do Canadá só exigem acompanhante e não contam.
+ * 19 (Coreia), R21, X, NC-17, "Restricted Screening" (Coreia), "A" (Índia), "R"/"A" (Canadá), "C"/"D"
+ * (México), "D" (Indonésia) e "III" (Hong Kong). 14A/18A do Canadá só exigem acompanhante e não contam.
  */
 export function isAdultsOnly(cert: unknown, country = ""): boolean {
   const c = String(cert ?? "").trim().toUpperCase();
   if (!c) return false;
   if (/^(X|XX|XXX|AO|NC-17|RESTRICTED SCREENING)$/.test(c)) return true;
-  if ((country === "IN" && c === "A") || (country === "HK" && c === "III") || (country === "MX" && /^[CD]$/.test(c))) return true;
+  if (
+    (country === "IN" && c === "A") ||
+    (country === "CA" && /^(R|A)$/.test(c)) ||
+    (country === "ID" && c === "D") ||
+    (country === "HK" && c === "III") ||
+    (country === "MX" && /^[CD]$/.test(c))
+  ) {
+    return true;
+  }
   if (/^\d{2}A$/.test(c)) return false;
   return Number(c.match(/(?<!\d)\d{2}(?!\d)/)?.[0]) >= 18;
+}
+
+// Códigos sem idade usados por vários países (Reino Unido, França, Austrália, Canadá...).
+const FOREIGN_LETTERS: Record<string, AgeRating> = { U: 0, G: 0, TP: 0, AL: 0, ALL: 0, E: 0, PG: 10, M: 14 };
+
+/**
+ * Classificação de outro país convertida para o ClassInd, arredondando para cima: "15" ou "MA15+"
+ * viram 16, "12A" vira 12, "U" vira L. Usada só quando não há classificação brasileira nem americana.
+ */
+export function parseForeign(cert: unknown): AgeRating | null {
+  const c = String(cert ?? "").trim().toUpperCase();
+  if (!c) return null;
+  if (c in FOREIGN_LETTERS) return FOREIGN_LETTERS[c];
+  const accompanied = c.match(/^(\d{2})A$/);
+  const age = accompanied ? Math.min(Number(accompanied[1]), 16) : Number(c.match(/(?<!\d)\d{1,2}(?!\d)/)?.[0]);
+  if (!Number.isFinite(age)) return null;
+  if (age === 0) return 0;
+  return AGE_RATINGS.find((r) => r >= age) ?? 18;
 }
 
 /** Temas adultos no título, assuntos ou descrição: o título fica fora do catálogo. */

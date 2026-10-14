@@ -28,7 +28,14 @@ export default async function ProfilesPage() {
                 <span className="rounded-2xl ring-2 ring-transparent transition group-hover:ring-amber">
                   <Avatar avatar={p.avatar} name={p.name} size={112} />
                 </span>
-                <span className="text-muted group-hover:text-text">{p.name}</span>
+                <span className="flex items-center gap-1 text-muted group-hover:text-text">
+                  {p.name}
+                  {p.pinHash && (
+                    <span aria-label="Perfil bloqueado" title="Perfil bloqueado">
+                      🔒
+                    </span>
+                  )}
+                </span>
                 <span className="-mt-2 text-xs text-muted">
                   {p.isKids && <span className="text-amber">Infantil · </span>}
                   {limitLabel(clampLimit(p.maxRating, p.isKids))}

@@ -24,8 +24,11 @@ export const KIDS_SHELVES = FREE_SHELVES.filter((s) => s.kids);
  */
 async function withArtwork<T extends Title>(item: T): Promise<T> {
   if (!item.year) return item;
-  const match = await findMovieArtwork(cleanTitle(item.title), item.year);
-  if (!match) return item;
+  const lookup = await findMovieArtwork(cleanTitle(item.title), item.year);
+  // Sem a verificação no TMDB não dá para saber se é adulto ou qual a classificação: fica oculto.
+  if (lookup.status === "error") return { ...item, ratingUnconfirmed: true };
+  if (lookup.status === "none") return item;
+  const match = lookup.match;
   // Filme marcado como adulto no TMDB: some de todas as listas e páginas.
   if (match.adult) return { ...item, adult: true };
   return {

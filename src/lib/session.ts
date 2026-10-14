@@ -50,12 +50,25 @@ export async function deleteSession() {
   store.delete(PROFILE_COOKIE);
 }
 
+// O perfil ativo também vai assinado: com o bloqueio de perfil, não pode ser trocado editando o cookie.
 export async function setActiveProfileId(profileId: string) {
-  (await cookies()).set(PROFILE_COOKIE, profileId, cookieOptions);
+  const token = await new SignJWT({ profileId })
+    .setProtectedHeader({ alg: "HS256" })
+    .setIssuedAt()
+    .setExpirationTime(`${MAX_AGE}s`)
+    .sign(secretKey());
+  (await cookies()).set(PROFILE_COOKIE, token, cookieOptions);
 }
 
-export async function getActiveProfileId() {
-  return (await cookies()).get(PROFILE_COOKIE)?.value ?? null;
+export async function getActiveProfileId(): Promise<string | null> {
+  const token = (await cookies()).get(PROFILE_COOKIE)?.value;
+  if (!token) return null;
+  try {
+    const { payload } = await jwtVerify(token, secretKey(), { algorithms: ["HS256"] });
+    return typeof payload.profileId === "string" ? payload.profileId : null;
+  } catch {
+    return null;
+  }
 }
 
 export const SESSION_COOKIE_NAME = SESSION_COOKIE;

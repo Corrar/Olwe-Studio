@@ -1,7 +1,7 @@
 import "server-only";
 import { BLOCKED_RATING, clampLimit, estimateRating, isAllowed, type AgeRating, type RatingInfo } from "./classification";
 import type { Profile } from "@/db/schema";
-import { getTmdbRating, type RatingLookup, type TmdbType } from "./tmdb";
+import { getTmdbRating } from "./tmdb";
 import type { Title } from "./types";
 
 /** Quem está assistindo: limite de classificação do perfil e se é infantil. */
@@ -11,24 +11,6 @@ export function viewerOf(profile: Pick<Profile, "maxRating" | "isKids" | "name">
   return { maxRating: clampLimit(profile.maxRating, profile.isKids), isKids: profile.isKids, name: profile.name };
 }
 
-// Uma fila só para as consultas de classificação do processo: uma página com várias fileiras não abre
-// dezenas de conexões ao TMDB ao mesmo tempo. Quem termina passa a vaga direto para o próximo da fila.
-const MAX_LOOKUPS = 12;
-let activeLookups = 0;
-const waiting: (() => void)[] = [];
-
-async function lookup(type: TmdbType, id: string | number): Promise<RatingLookup> {
-  if (activeLookups < MAX_LOOKUPS) activeLookups++;
-  else await new Promise<void>((resolve) => waiting.push(resolve));
-  try {
-    return await getTmdbRating(type, id);
-  } finally {
-    const next = waiting.shift();
-    if (next) next();
-    else activeLookups--;
-  }
-}
-
 /**
  * Classificação do título: a oficial ou equivalente do TMDB ou, quando nenhum país classifica, a
  * estimativa conservadora. Null quando a consulta falhou: sem classificação confirmada o título não
@@ -36,14 +18,16 @@ async function lookup(type: TmdbType, id: string | number): Promise<RatingLookup
  */
 export async function ratingOf(t: Title): Promise<RatingInfo | null> {
   if (t.ageRating) return t.ageRating;
+  if (t.ratingUnconfirmed) return null;
   // Filme completo: usa a classificação do mesmo filme no TMDB, quando ele foi identificado.
   const tmdbId = t.type === "movie" || t.type === "tv" ? t.id : t.tmdbMatchId;
   if (tmdbId) {
-    const result = await lookup(t.type === "tv" ? "tv" : "movie", tmdbId);
+    const result = await getTmdbRating(t.type === "tv" ? "tv" : "movie", tmdbId);
     if (result.status === "error") return null;
     if (result.status === "found") return result.rating;
   }
-  return estimateRating(t.genreIds, `${t.title} ${t.overview}`);
+  // As listas recebem a sinopse cortada em 600 caracteres: a estimativa usa o mesmo trecho em toda página.
+  return estimateRating(t.genreIds, `${t.title} ${t.overview.slice(0, 600)}`);
 }
 
 export async function withRatings<T extends Title>(items: T[]): Promise<T[]> {

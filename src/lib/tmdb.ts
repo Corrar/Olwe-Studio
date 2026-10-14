@@ -1,7 +1,7 @@
 import "server-only";
 import { MOVIE_GENRES, TV_GENRES } from "./genres";
 import { MOCK_TITLES, mockList } from "./mock-catalog";
-import { estimateRating, isAdultsOnly, parseBrazilian, parseUs, type RatingInfo } from "./classification";
+import { estimateRating, isAdultsOnly, parseBrazilian, parseForeign, parseUs, type RatingInfo } from "./classification";
 import { isRecent, NEW_RELEASE_DAYS, type Title, type TitleDetails, type WatchProviders } from "./types";
 
 const API = "https://api.themoviedb.org/3";
@@ -14,6 +14,40 @@ export const isDemoCatalog = !process.env.TMDB_API_KEY;
 type Raw = Record<string, any>;
 
 type TmdbResult<T> = { ok: true; data: T } | { ok: false; notFound: boolean };
+
+// Fila única do processo para as consultas que decidem se um título pode ser exibido (classificação e
+// identificação dos filmes livres): uma página com muitas fileiras não dispara centenas de conexões ao
+// TMDB de uma vez. Quem termina passa a vaga para o próximo; quem espera demais desiste e o título
+// fica oculto (nunca é exibido sem a verificação).
+const MAX_LOOKUPS = 20;
+const QUEUE_TIMEOUT_MS = 12_000;
+let activeLookups = 0;
+const waiting: (() => void)[] = [];
+
+async function queued<T>(fn: () => Promise<T>, onTimeout: T): Promise<T> {
+  if (activeLookups < MAX_LOOKUPS) activeLookups++;
+  else {
+    const granted = await new Promise<boolean>((resolve) => {
+      const grant = () => {
+        clearTimeout(timer);
+        resolve(true);
+      };
+      const timer = setTimeout(() => {
+        waiting.splice(waiting.indexOf(grant), 1);
+        resolve(false);
+      }, QUEUE_TIMEOUT_MS);
+      waiting.push(grant);
+    });
+    if (!granted) return onTimeout;
+  }
+  try {
+    return await fn();
+  } finally {
+    const next = waiting.shift();
+    if (next) next();
+    else activeLookups--;
+  }
+}
 
 /** Consulta ao TMDB que diferencia "não existe" (404) de falha (rede, tempo esgotado, limite, erro). */
 async function tmdbResult<T = Raw>(path: string, params: Record<string, string> = {}, revalidate = 3600): Promise<TmdbResult<T>> {
@@ -147,7 +181,7 @@ export async function getTitle(type: TmdbType, id: string): Promise<TitleDetails
     videos.find((v) => v.site === "YouTube" && v.type === "Teaser");
 
   // Sem classificação em nenhum país, vale a estimativa (que considera gêneros, título e sinopse).
-  const ageRating = ratingFromRaw(type, raw) ?? estimateRating(base.genreIds, `${base.title} ${base.overview}`);
+  const ageRating = ratingFromRaw(type, raw) ?? estimateRating(base.genreIds, `${base.title} ${base.overview.slice(0, 600)}`);
   const certification = ageRating && ageRating.source === "oficial" ? (ageRating.value === 0 ? "L" : String(ageRating.value)) : null;
 
   return {
@@ -202,7 +236,8 @@ function toProviders(region: Raw | undefined): WatchProviders | null {
 /**
  * Classificação a partir de release_dates (filmes) ou content_ratings (séries) do TMDB:
  * a brasileira (oficial); sem ela, 18 se algum país classificar como só para adultos; senão a
- * americana convertida (equivalente). Null quando nenhum país informa classificação.
+ * americana convertida (equivalente); senão a mais alta dos outros países convertida para o ClassInd
+ * (estimada, que perfis infantis não aceitam). Null quando nenhum país informa classificação.
  */
 function ratingFromRaw(type: TmdbType, raw: Raw): RatingInfo | null {
   type Entry = { country: string; cert: string; descriptors: string[] };
@@ -229,6 +264,11 @@ function ratingFromRaw(type: TmdbType, raw: Raw): RatingInfo | null {
   if (all.some((e) => isAdultsOnly(e.cert, e.country))) return { value: 18, source: "equivalente", descriptors: [] };
   const us = pick("US", parseUs);
   if (us) return { value: us.value, source: "equivalente", descriptors: [] };
+  const foreign = all
+    .map((e) => parseForeign(e.cert))
+    .filter((v): v is RatingInfo["value"] => v !== null)
+    .sort((a, b) => b - a)[0];
+  if (foreign !== undefined) return { value: foreign, source: "estimada", descriptors: [] };
   return null;
 }
 
@@ -242,7 +282,7 @@ export async function getTmdbRating(type: TmdbType, id: string | number): Promis
     return rating ? { status: "found", rating } : { status: "none" };
   }
   const path = type === "movie" ? `/movie/${id}/release_dates` : `/tv/${id}/content_ratings`;
-  const result = await tmdbResult(path, {}, 60 * 60 * 24 * 7);
+  const result = await queued(() => tmdbResult(path, {}, 60 * 60 * 24 * 7), { ok: false, notFound: false } as const);
   if (!result.ok) return result.notFound ? { status: "none" } : { status: "error" };
   const rating = ratingFromRaw(type, type === "movie" ? { release_dates: result.data } : { content_ratings: result.data });
   return rating ? { status: "found", rating } : { status: "none" };
@@ -263,6 +303,9 @@ export type ArtworkMatch = {
   adult: boolean;
 };
 
+/** match = filme identificado; none = o TMDB respondeu e não há o mesmo filme; error = não deu para consultar. */
+export type ArtworkLookup = { status: "match"; match: ArtworkMatch } | { status: "none" } | { status: "error" };
+
 function normalize(text: string) {
   return text
     .toLocaleLowerCase("en")
@@ -273,29 +316,41 @@ function normalize(text: string) {
 }
 
 /**
- * Procura um filme no TMDB para usar o pôster e a sinopse em português. Exige título exatamente igual
- * (nome em português ou original) e ano de lançamento com até 1 ano de diferença, para não colar a arte
- * de outro filme num vídeo de licença aberta.
+ * Procura um filme livre no TMDB pelo título exato (em português ou original) e ano com até 1 de
+ * diferença. Serve para identificar o filme (classificação oficial e marcação de conteúdo adulto) e
+ * para usar o pôster e a sinopse em português, sem colar a arte de outro filme num vídeo livre.
  */
-export async function findMovieArtwork(title: string, year: string): Promise<ArtworkMatch | null> {
-  if (isDemoCatalog || !title) return null;
+export async function findMovieArtwork(title: string, year: string): Promise<ArtworkLookup> {
+  if (isDemoCatalog || !title) return { status: "none" };
   // Inclui resultados adultos para identificar (e tirar do catálogo) filmes livres que são adultos.
-  const data = await tmdb("/search/movie", { query: title, include_adult: "true" }, 60 * 60 * 24 * 7);
+  const result = await queued(
+    () => tmdbResult("/search/movie", { query: title, include_adult: "true" }, 60 * 60 * 24 * 7),
+    { ok: false, notFound: false } as const,
+  );
+  if (!result.ok) return result.notFound ? { status: "none" } : { status: "error" };
   const wanted = normalize(title);
   const target = Number(year);
-  const match = (data?.results ?? []).find((r: Raw) => {
+  const same = (result.data.results ?? []).filter((r: Raw) => {
     const released = Number(String(r.release_date ?? "").slice(0, 4));
     const names = [r.title, r.original_title].filter(Boolean).map((n: string) => normalize(n));
-    return r.poster_path && released && Math.abs(released - target) <= 1 && names.includes(wanted);
+    return released && Math.abs(released - target) <= 1 && names.includes(wanted);
   });
-  if (!match) return null;
+  // Qualquer homônimo adulto do mesmo ano tira o filme do catálogo; a arte só vem de um resultado com pôster.
+  if (same.some((r: Raw) => r.adult === true)) {
+    return { status: "match", match: { id: same[0].id, poster: null, backdrop: null, overview: "", genreIds: [], adult: true } };
+  }
+  const match = same.find((r: Raw) => r.poster_path) ?? same[0];
+  if (!match) return { status: "none" };
   return {
-    id: match.id,
-    poster: imageUrl(match.poster_path, "w500"),
-    backdrop: imageUrl(match.backdrop_path, "w1280"),
-    overview: match.overview ?? "",
-    genreIds: match.genre_ids ?? [],
-    adult: match.adult === true,
+    status: "match",
+    match: {
+      id: match.id,
+      poster: imageUrl(match.poster_path ?? null, "w500"),
+      backdrop: imageUrl(match.backdrop_path ?? null, "w1280"),
+      overview: match.overview ?? "",
+      genreIds: match.genre_ids ?? [],
+      adult: false,
+    },
   };
 }
 

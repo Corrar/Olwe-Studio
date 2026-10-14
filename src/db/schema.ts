@@ -26,6 +26,8 @@ export const profiles = sqliteTable("profiles", {
   isKids: integer("is_kids", { mode: "boolean" }).notNull().default(false),
   /** Classificação indicativa máxima que o perfil pode ver (0 = livre). Conteúdo 18+ nunca aparece. */
   maxRating: integer("max_rating").notNull().default(16),
+  /** Bloqueio de perfil (como na Netflix): hash do PIN de 4 dígitos, ou null sem bloqueio. */
+  pinHash: text("pin_hash"),
   createdAt: createdAt(),
 });
 

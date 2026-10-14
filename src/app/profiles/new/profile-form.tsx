@@ -77,7 +77,26 @@ export function ProfileForm() {
           Títulos acima desse limite não aparecem neste perfil. Conteúdo 18+ não existe no Olwe.
         </span>
       </label>
-      {state?.error && <p className="text-sm text-ember">{state.error}</p>}
+      {(!isKids || limit > DEFAULT_KIDS_LIMIT) && (
+        <label className="block space-y-2">
+          <span className="text-sm text-muted">Senha da conta</span>
+          <input
+            name="password"
+            type="password"
+            required
+            autoComplete="current-password"
+            className="w-full rounded-xl border border-line bg-surface px-4 py-3 focus:border-amber focus:outline-none"
+          />
+          <span className="block text-xs text-muted">
+            Perfis com mais conteúdo que o infantil padrão pedem a senha, para o controle parental não ser contornado.
+          </span>
+        </label>
+      )}
+      {state?.error && (
+        <p role="alert" className="text-sm text-ember">
+          {state.error}
+        </p>
+      )}
       <div className="flex gap-3">
         <button disabled={pending} className="bg-brand flex-1 rounded-full py-3 font-semibold text-ink disabled:opacity-60">
           {pending ? "Criando…" : "Criar perfil"}

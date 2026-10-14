@@ -29,6 +29,8 @@ export interface Title {
   adult?: boolean;
   /** Filme do TMDB correspondente (filmes completos), usado para buscar a classificação oficial. */
   tmdbMatchId?: number | null;
+  /** Não foi possível verificar o filme no TMDB agora (falha na consulta): não é exibido. */
+  ratingUnconfirmed?: boolean;
 }
 
 export type Quality = "4K" | "Full HD" | "HD" | "SD";

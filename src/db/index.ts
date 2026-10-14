@@ -34,11 +34,17 @@ if (shared.__olweMigration?.key !== migrationKey) {
   const previous = shared.__olweMigration?.done ?? Promise.resolve();
   shared.__olweMigration = {
     key: migrationKey,
-    done: previous.then(() =>
-      migrate(db, { migrationsFolder }).catch((err) => {
+    // Outro processo (outro worker do build, outra instância) pode estar migrando o mesmo banco: tenta
+    // de novo depois de uma pausa; a segunda tentativa só aplica o que ainda faltar.
+    done: previous
+      .then(() => migrate(db, { migrationsFolder }))
+      .catch(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+        await migrate(db, { migrationsFolder });
+      })
+      .catch((err) => {
         console.error("[db] falha ao aplicar migrações", err);
       }),
-    ),
   };
 }
 await shared.__olweMigration.done;
