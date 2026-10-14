@@ -3,23 +3,28 @@ import { HeroSection } from "@/components/hero-section";
 import { Row } from "@/components/row";
 import { TitleCard } from "@/components/title-card";
 import { TitleRow } from "@/components/title-row";
-import { requireProfile } from "@/lib/dal";
-import { getContinueWatching, getWatchlist } from "@/lib/library";
-import { FREE_SHELVES, getFreeShelf, KIDS_SHELVES } from "@/lib/free";
 import { getTitlesByRef } from "@/lib/catalog";
+import { requireProfile } from "@/lib/dal";
+import { FREE_SHELVES, getFreeShelf, KIDS_SHELVES } from "@/lib/free";
+import { getContinueWatching, getWatchlist } from "@/lib/library";
+import { forViewer, viewerOf } from "@/lib/ratings";
 import { getByGenre, getList, getTrending } from "@/lib/tmdb";
 
 export const metadata: Metadata = { title: "Início" };
 
 export default async function BrowsePage() {
   const profile = await requireProfile();
+  const viewer = viewerOf(profile);
+  // Toda fileira passa pelas regras de classificação do perfil (sem 18+, sem títulos acima do limite).
+  const allowed = <T extends Parameters<typeof forViewer>[0][number]>(items: Promise<T[]> | T[]) =>
+    Promise.resolve(items).then((list) => forViewer(list, viewer));
 
   if (profile.isKids) {
     const [animMovies, familyMovies, kidsTv, cartoons] = await Promise.all([
-      getByGenre("movie", [16]),
-      getByGenre("movie", [10751]),
-      getByGenre("tv", [10762, 16]),
-      Promise.all(KIDS_SHELVES.map((s) => getFreeShelf(s.key, 16))).then((r) => r.flat()),
+      allowed(getByGenre("movie", [16])),
+      allowed(getByGenre("movie", [10751])),
+      allowed(getByGenre("tv", [10762, 16])),
+      allowed(Promise.all(KIDS_SHELVES.map((s) => getFreeShelf(s.key, 16))).then((r) => r.flat())),
     ]);
     return (
       <>
@@ -34,18 +39,18 @@ export default async function BrowsePage() {
     );
   }
 
-  const [freeMovies, trending, popularMovies, popularTv, topMovies, topTv, nowPlaying, continueRefs, listRefs] = await Promise.all([
-    getFreeShelf(FREE_SHELVES[0].key, 16),
-    getTrending(),
-    getList("movie", "popular"),
-    getList("tv", "popular"),
-    getList("movie", "top_rated"),
-    getList("tv", "top_rated"),
-    getList("movie", "now_playing"),
-    getContinueWatching(profile.id),
-    getWatchlist(profile.id),
+  const [continueRefs, listRefs] = await Promise.all([getContinueWatching(profile.id), getWatchlist(profile.id)]);
+  const [freeMovies, trending, popularMovies, popularTv, topMovies, topTv, nowPlaying, continueTitles, myList] = await Promise.all([
+    allowed(getFreeShelf(FREE_SHELVES[0].key, 16)),
+    allowed(getTrending()),
+    allowed(getList("movie", "popular")),
+    allowed(getList("tv", "popular")),
+    allowed(getList("movie", "top_rated")),
+    allowed(getList("tv", "top_rated")),
+    allowed(getList("movie", "now_playing")),
+    allowed(getTitlesByRef(continueRefs)),
+    allowed(getTitlesByRef(listRefs.slice(0, 20))),
   ]);
-  const [continueTitles, myList] = await Promise.all([getTitlesByRef(continueRefs), getTitlesByRef(listRefs.slice(0, 20))]);
 
   return (
     <>

@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { TitleCard } from "@/components/title-card";
+import { requireProfile } from "@/lib/dal";
 import { searchFree } from "@/lib/free";
+import { forViewer, viewerOf, type Viewer } from "@/lib/ratings";
 import { searchTitles } from "@/lib/tmdb";
 import type { Title } from "@/lib/types";
 
@@ -22,12 +24,13 @@ function Results({ heading, note, items }: { heading: string; note: string; item
   );
 }
 
-async function FreeResults({ query }: { query: string }) {
-  return <Results heading="Filmes completos e grátis" note="Assista inteiro aqui no Olwe." items={await searchFree(query)} />;
+async function FreeResults({ query, viewer }: { query: string; viewer: Viewer }) {
+  const items = await forViewer(await searchFree(query), viewer);
+  return <Results heading="Filmes completos e grátis" note="Assista inteiro aqui no Olwe." items={items} />;
 }
 
-async function TmdbResults({ query }: { query: string }) {
-  const items = await searchTitles(query);
+async function TmdbResults({ query, viewer }: { query: string; viewer: Viewer }) {
+  const items = await forViewer(await searchTitles(query), viewer);
   return <Results heading="Filmes e séries" note="Só sinopse e trailer." items={items} />;
 }
 
@@ -38,6 +41,7 @@ function Loading({ label }: { label: string }) {
 export default async function SearchPage({ searchParams }: PageProps<"/search">) {
   const { q } = await searchParams;
   const query = typeof q === "string" ? q.trim().slice(0, 100) : "";
+  const viewer = viewerOf(await requireProfile());
 
   return (
     <div className="px-4 pt-24 sm:px-10">
@@ -54,10 +58,10 @@ export default async function SearchPage({ searchParams }: PageProps<"/search">)
         <>
           {/* Cada fonte aparece assim que responde: o TMDB costuma chegar antes dos filmes completos. */}
           <Suspense fallback={<Loading label="Procurando filmes completos…" />}>
-            <FreeResults query={query} />
+            <FreeResults query={query} viewer={viewer} />
           </Suspense>
           <Suspense fallback={<Loading label="Procurando filmes e séries…" />}>
-            <TmdbResults query={query} />
+            <TmdbResults query={query} viewer={viewer} />
           </Suspense>
         </>
       )}

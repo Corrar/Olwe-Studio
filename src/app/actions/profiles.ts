@@ -7,6 +7,7 @@ import { z } from "zod";
 import { db } from "@/db";
 import { profiles } from "@/db/schema";
 import { AVATARS, MAX_PROFILES } from "@/lib/avatars";
+import { clampLimit } from "@/lib/classification";
 import { requireUser } from "@/lib/dal";
 import { setActiveProfileId } from "@/lib/session";
 import type { FormState } from "./auth";
@@ -29,7 +30,8 @@ export async function createProfile(_: FormState, formData: FormData): Promise<F
   const [{ total }] = await db.select({ total: count() }).from(profiles).where(eq(profiles.userId, user.id));
   if (total >= MAX_PROFILES) return { error: `Limite de ${MAX_PROFILES} perfis atingido.` };
 
-  await db.insert(profiles).values({ id: crypto.randomUUID(), userId: user.id, ...parsed.data });
+  const maxRating = clampLimit(formData.get("maxRating") ?? (parsed.data.isKids ? 10 : 16), parsed.data.isKids);
+  await db.insert(profiles).values({ id: crypto.randomUUID(), userId: user.id, ...parsed.data, maxRating });
   revalidatePath("/profiles");
   redirect("/profiles");
 }
@@ -51,4 +53,17 @@ export async function deleteProfile(profileId: string) {
   if (total <= 1) return;
   await db.delete(profiles).where(and(eq(profiles.id, profileId), eq(profiles.userId, user.id)));
   revalidatePath("/profiles");
+}
+
+/** Altera o limite de classificação do perfil (perfis infantis vão no máximo até 12). */
+export async function updateProfileLimit(profileId: string, formData: FormData) {
+  const user = await requireUser();
+  const profile = await db.query.profiles.findFirst({
+    where: and(eq(profiles.id, profileId), eq(profiles.userId, user.id)),
+    columns: { id: true, isKids: true },
+  });
+  if (!profile) return;
+  const maxRating = clampLimit(formData.get("maxRating"), profile.isKids);
+  await db.update(profiles).set({ maxRating }).where(and(eq(profiles.id, profile.id), eq(profiles.userId, user.id)));
+  revalidatePath("/profiles/manage");
 }

@@ -4,20 +4,24 @@ import { Suspense } from "react";
 import { HeroSection } from "@/components/hero-section";
 import { TitleCard } from "@/components/title-card";
 import { TitleRow } from "@/components/title-row";
+import { requireProfile } from "@/lib/dal";
 import { FREE_SHELVES, getFreeShelf, getFreeShelfPage, type FreeShelf } from "@/lib/free";
+import { forViewer, viewerOf, type Viewer } from "@/lib/ratings";
 
 export const metadata: Metadata = { title: "Filmes completos" };
 
 const ROW_SIZE = 16;
 const MAX_PAGE = 50;
 
-async function Shelf({ shelf }: { shelf: FreeShelf }) {
-  const items = await getFreeShelf(shelf.key, ROW_SIZE);
+async function Shelf({ shelf, viewer }: { shelf: FreeShelf; viewer: Viewer }) {
+  const items = await forViewer(await getFreeShelf(shelf.key, ROW_SIZE), viewer);
   return <TitleRow title={shelf.label} items={items} href={`/free?shelf=${shelf.key}`} />;
 }
 
-async function ShelfPage({ shelf, page }: { shelf: FreeShelf; page: number }) {
-  const { items, hasMore } = await getFreeShelfPage(shelf.key, page);
+async function ShelfPage({ shelf, page, viewer }: { shelf: FreeShelf; page: number; viewer: Viewer }) {
+  const result = await getFreeShelfPage(shelf.key, page);
+  const items = await forViewer(result.items, viewer);
+  const hasMore = result.hasMore;
   return (
     <>
       <div className="flex flex-wrap gap-4">
@@ -54,8 +58,8 @@ function GridSkeleton() {
   );
 }
 
-async function Featured() {
-  return <HeroSection items={await getFreeShelf(FREE_SHELVES[0].key, 5)} />;
+async function Featured({ viewer }: { viewer: Viewer }) {
+  return <HeroSection items={await forViewer(await getFreeShelf(FREE_SHELVES[0].key, 8), viewer)} />;
 }
 
 function RowSkeleton({ label }: { label: string }) {
@@ -73,6 +77,7 @@ function RowSkeleton({ label }: { label: string }) {
 
 export default async function FreeMoviesPage({ searchParams }: PageProps<"/free">) {
   const { shelf: shelfKey, page: pageParam } = await searchParams;
+  const viewer = viewerOf(await requireProfile());
   const shelf = FREE_SHELVES.find((s) => s.key === shelfKey);
 
   // "Ver tudo" de uma prateleira, com paginação.
@@ -85,7 +90,7 @@ export default async function FreeMoviesPage({ searchParams }: PageProps<"/free"
         </Link>
         <h1 className="mb-6 mt-2 font-display text-2xl font-semibold">{shelf.label}</h1>
         <Suspense key={page} fallback={<GridSkeleton />}>
-          <ShelfPage shelf={shelf} page={page} />
+          <ShelfPage shelf={shelf} page={page} viewer={viewer} />
         </Suspense>
       </div>
     );
@@ -94,7 +99,7 @@ export default async function FreeMoviesPage({ searchParams }: PageProps<"/free"
   return (
     <>
       <Suspense fallback={<div className="h-[68vh] min-h-[420px] w-full animate-pulse bg-surface" />}>
-        <Featured />
+        <Featured viewer={viewer} />
       </Suspense>
       <div className="-mt-10 relative space-y-10">
         <p className="px-4 text-sm text-muted sm:px-10">
@@ -103,7 +108,7 @@ export default async function FreeMoviesPage({ searchParams }: PageProps<"/free"
         </p>
         {FREE_SHELVES.map((s) => (
           <Suspense key={s.key} fallback={<RowSkeleton label={s.label} />}>
-            <Shelf shelf={s} />
+            <Shelf shelf={s} viewer={viewer} />
           </Suspense>
         ))}
       </div>

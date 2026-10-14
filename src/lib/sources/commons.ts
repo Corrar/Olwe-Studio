@@ -3,6 +3,7 @@
 // menos 720p e duração mínima. O Olwe toca as versões que o próprio Commons gera para navegadores
 // (VP9 + Opus), que têm boa qualidade de imagem e de som com tamanho razoável.
 
+import { ADULT_CONTENT } from "../classification";
 import { isRecent, NEW_ADDITION_DAYS, qualityOf, type Title, type TitleDetails, type VideoSource } from "../types";
 import { fetchJson, normalize, safeUrl, stripHtml, truncate, yearFromTitle, type Raw } from "./shared";
 
@@ -110,6 +111,8 @@ function toCandidate(page: Raw, minMinutes: number): Candidate | null {
   if (!fileName || fileName.length > MAX_ID_LENGTH) return null;
   const objectName = meta(v, "ObjectName");
   if (NOT_A_FILM.test(fileName) || NOT_A_FILM.test(objectName)) return null;
+  // Conteúdo adulto fica fora do catálogo.
+  if (ADULT_CONTENT.test(`${fileName} ${objectName} ${meta(v, "ImageDescription")}`)) return null;
   const served = bestServed(v);
 
   return {

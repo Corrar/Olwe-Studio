@@ -17,6 +17,7 @@ const SEEDS: Seed[] = [
   [9010, "movie", "Duas Margens", "2024", 7.5, [10749, 18], "Um barqueiro e uma bióloga se encontram todo verão na mesma travessia do rio, por dez anos seguidos."],
   [9011, "movie", "Arquivo Morto", "2022", 6.8, [53, 80], "Uma estagiária de cartório encontra uma escritura assinada por alguém que morreu cinquenta anos antes."],
   [9012, "movie", "Gente da Serra", "2025", 8.3, [99], "Um retrato de quatro estações das famílias que mantêm vivas as últimas plantações de café de altitude da Mantiqueira."],
+  [9013, "movie", "Noite Sem Volta", "2025", 6.4, [53, 80], "Título fictício classificado como 18 anos, usado para testar que conteúdo adulto nunca aparece no Olwe."],
   [9101, "tv", "Linha Vermelha", "2024", 8.4, [80, 18], "Uma delegada recém-transferida desmonta, caso a caso, a rede de corrupção do próprio departamento."],
   [9102, "tv", "Estação Aurora", "2025", 7.9, [10765, 9648], "Em uma cidade onde o sol não se põe há três anos, um adolescente encontra a primeira noite escondida num sótão."],
   [9103, "tv", "Os Vizinhos do 302", "2023", 7.3, [35], "Um condomínio barulhento, uma síndica implacável e uma reunião de moradores que nunca termina."],
@@ -28,6 +29,13 @@ const SEEDS: Seed[] = [
   [9109, "tv", "Família Quase Perfeita", "2022", 7.0, [35, 10751], "Depois de um sorteio milionário, uma família comum tenta continuar exatamente igual. Não consegue."],
   [9110, "tv", "Ecos do Sertão", "2025", 8.2, [18, 10768], "Uma saga de três gerações marcada pela seca, pela política e por uma promessa feita na beira de um açude."],
 ];
+
+// Classificações coerentes com cada sinopse (o 9013 existe só para testar que 18+ é removido).
+const CERTIFICATIONS: Record<number, string> = {
+  9001: "14", 9002: "12", 9003: "12", 9004: "L", 9005: "16", 9006: "10", 9007: "10", 9008: "14", 9009: "L",
+  9010: "12", 9011: "14", 9012: "L", 9013: "18", 9101: "16", 9102: "12", 9103: "10", 9104: "14", 9105: "L",
+  9106: "14", 9107: "L", 9108: "12", 9109: "10", 9110: "14",
+};
 
 const CAST_NAMES = ["Lia Monteiro", "Caio Rezende", "Iara Batista", "Tomás Albuquerque", "Nina Sayuri", "Rafael Okoye", "Bea Lacerda", "Joca Martins"];
 
@@ -63,7 +71,7 @@ function build(seed: Seed): TitleDetails {
       photo: null,
     })),
     trailerKey: null,
-    certification: ["L", "10", "12", "14", "16"][id % 5],
+    certification: CERTIFICATIONS[id] ?? "14",
     recommendations: [],
     providers: null,
     videoSources: [],

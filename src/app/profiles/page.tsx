@@ -7,6 +7,7 @@ import { Logo } from "@/components/logo";
 import { db } from "@/db";
 import { profiles } from "@/db/schema";
 import { MAX_PROFILES } from "@/lib/avatars";
+import { clampLimit, limitLabel } from "@/lib/classification";
 import { requireUser } from "@/lib/dal";
 
 export const metadata: Metadata = { title: "Quem está assistindo?" };
@@ -28,7 +29,10 @@ export default async function ProfilesPage() {
                   <Avatar avatar={p.avatar} name={p.name} size={112} />
                 </span>
                 <span className="text-muted group-hover:text-text">{p.name}</span>
-                {p.isKids && <span className="-mt-2 text-xs text-amber">Infantil</span>}
+                <span className="-mt-2 text-xs text-muted">
+                  {p.isKids && <span className="text-amber">Infantil · </span>}
+                  {limitLabel(clampLimit(p.maxRating, p.isKids))}
+                </span>
               </button>
             </form>
           </li>

@@ -4,11 +4,15 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Artwork } from "@/components/artwork";
 import { AvailabilityBadge, NewBadge } from "@/components/badges";
+import { Avatar } from "@/components/avatar";
+import { RatingBadge } from "@/components/rating-badge";
 import { TitleRow } from "@/components/title-row";
 import { WatchlistButton } from "@/components/watchlist-button";
 import { getTitle } from "@/lib/catalog";
 import { requireProfile } from "@/lib/dal";
+import { limitLabel, ratingLabel, type RatingInfo } from "@/lib/classification";
 import { getProgress, isInWatchlist } from "@/lib/library";
+import { accessFor, forViewer, viewerOf } from "@/lib/ratings";
 import { isFullMovie, isMediaType, type WatchProvider, type WatchProviders } from "@/lib/types";
 
 type Props = PageProps<"/title/[type]/[id]">;
@@ -23,7 +27,30 @@ async function load(params: Props["params"]) {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const title = await load(params);
+  const access = await accessFor(title, viewerOf(await requireProfile()));
+  if (access.status === "removed") notFound();
+  if (access.status === "blocked-for-profile") return { title: "Indisponível para este perfil" };
   return { title: title.title, description: title.overview.slice(0, 200) };
+}
+
+function RatingDetails({ rating }: { rating: RatingInfo }) {
+  const what = rating.value === 0 ? "Livre para todos os públicos" : `Não recomendado para menores de ${rating.value} anos`;
+  const source =
+    rating.source === "oficial"
+      ? "classificação indicativa oficial"
+      : rating.source === "equivalente"
+        ? "equivalente à classificação americana"
+        : "estimada pelo Olwe";
+  return (
+    <p className="flex items-center gap-3 text-sm text-text/80">
+      <RatingBadge rating={rating} />
+      <span>
+        {what}
+        {rating.descriptors.length > 0 && ` · ${rating.descriptors.join(", ")}`}
+        <span className="text-muted"> ({source})</span>
+      </span>
+    </p>
+  );
 }
 
 function formatRuntime(minutes: number) {
@@ -34,7 +61,34 @@ function formatRuntime(minutes: number) {
 
 export default async function TitlePage({ params }: Props) {
   const profile = await requireProfile();
+  const viewer = viewerOf(profile);
   const title = await load(params);
+  const access = await accessFor(title, viewer);
+  // Conteúdo 18+ não existe no Olwe; títulos acima do limite do perfil ficam bloqueados, como na Netflix.
+  if (access.status === "removed") notFound();
+  if (access.status === "blocked-for-profile") {
+    return (
+      <div className="mx-auto flex min-h-[70vh] max-w-lg flex-col items-center justify-center gap-5 px-4 pt-24 text-center">
+        <Avatar avatar={profile.avatar} name={profile.name} size={64} />
+        <h1 className="font-display text-2xl font-semibold">Indisponível para este perfil</h1>
+        <p className="flex items-center gap-2 text-muted">
+          Este título tem classificação <RatingBadge rating={access.rating} size="sm" /> e o perfil {profile.name} está configurado
+          para {limitLabel(viewer.maxRating).toLowerCase()}
+          {viewer.isKids && access.rating.source === "estimada" ? ", e perfis infantis só exibem títulos com classificação oficial" : ""}.
+        </p>
+        <div className="flex flex-wrap justify-center gap-3">
+          <Link href="/profiles" className="bg-brand rounded-full px-6 py-3 font-semibold text-ink">
+            Trocar de perfil
+          </Link>
+          <Link href="/browse" className="rounded-full bg-white/10 px-6 py-3 font-semibold hover:bg-white/20">
+            Voltar ao início
+          </Link>
+        </div>
+      </div>
+    );
+  }
+  const rating = access.rating;
+  const recommendations = await forViewer(title.recommendations, viewer);
   const full = isFullMovie(title);
   const [saved, progress] = await Promise.all([
     isInWatchlist(profile.id, title.type, title.id),
@@ -69,7 +123,7 @@ export default async function TitlePage({ params }: Props) {
                 {title.seasons.length} {title.seasons.length === 1 ? "temporada" : "temporadas"}
               </span>
             )}
-            {title.certification && <span className="rounded border border-line px-1.5 py-0.5 text-xs">{title.certification}</span>}
+            <span className="sr-only">Classificação {ratingLabel(rating.value)}</span>
           </div>
 
           <p className="max-w-2xl whitespace-pre-line text-text/90">
@@ -77,6 +131,8 @@ export default async function TitlePage({ params }: Props) {
           </p>
 
           {title.genres.length > 0 && <p className="text-sm text-muted">{title.genres.map((g) => g.name).join(" · ")}</p>}
+
+          <RatingDetails rating={rating} />
 
           {!full && (
             <p className="max-w-2xl rounded-xl border border-line bg-black/40 px-4 py-3 text-sm text-text/80 backdrop-blur">
@@ -173,7 +229,7 @@ export default async function TitlePage({ params }: Props) {
           </section>
         )}
 
-        <TitleRow title="Quem assistiu também gostou" items={title.recommendations} />
+        <TitleRow title="Quem assistiu também gostou" items={recommendations} />
       </div>
     </article>
   );

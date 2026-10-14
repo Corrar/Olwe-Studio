@@ -15,6 +15,13 @@
       "when": 1791931251831,
       "tag": "0001_text_item_ids",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1791937522173,
+      "tag": "0002_profile_max_rating",
+      "breakpoints": true
     }
   ]
 }

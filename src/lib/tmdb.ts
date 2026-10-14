@@ -1,6 +1,7 @@
 import "server-only";
 import { MOVIE_GENRES, TV_GENRES } from "./genres";
 import { MOCK_TITLES, mockList } from "./mock-catalog";
+import { parseBrazilian, parseUs, type RatingInfo } from "./classification";
 import { isRecent, NEW_RELEASE_DAYS, type Title, type TitleDetails, type WatchProviders } from "./types";
 
 const API = "https://api.themoviedb.org/3";
@@ -34,7 +35,7 @@ async function tmdb<T = Raw>(path: string, params: Record<string, string> = {}, 
   }
 }
 
-type TmdbType = "movie" | "tv";
+export type TmdbType = "movie" | "tv";
 
 function toTitle(raw: Raw, fallbackType?: TmdbType): Title | null {
   const type: TmdbType | undefined = raw.media_type ?? fallbackType;
@@ -51,6 +52,7 @@ function toTitle(raw: Raw, fallbackType?: TmdbType): Title | null {
     rating: Math.round((raw.vote_average ?? 0) * 10) / 10,
     genreIds: raw.genre_ids ?? raw.genres?.map((g: Raw) => g.id) ?? [],
     isNew: isRecent(date, NEW_RELEASE_DAYS),
+    adult: raw.adult === true,
   };
 }
 
@@ -107,6 +109,7 @@ export async function getTitle(type: TmdbType, id: string): Promise<TitleDetails
     const names = type === "movie" ? MOVIE_GENRES : TV_GENRES;
     return {
       ...t,
+      ageRating: mockRating(t.certification),
       genres: t.genreIds.map((g) => ({ id: g, name: names[g] ?? "" })).filter((g) => g.name),
       recommendations: mockList((m) => m.type === type && m.id !== id, Number(id) % 5).slice(0, 10),
     };
@@ -127,16 +130,12 @@ export async function getTitle(type: TmdbType, id: string): Promise<TitleDetails
     videos.find((v) => v.site === "YouTube" && v.type === "Trailer") ??
     videos.find((v) => v.site === "YouTube" && v.type === "Teaser");
 
-  let certification: string | null = null;
-  if (type === "movie") {
-    const br = raw.release_dates?.results?.find((r: Raw) => r.iso_3166_1 === REGION);
-    certification = br?.release_dates?.find((d: Raw) => d.certification)?.certification ?? null;
-  } else {
-    certification = raw.content_ratings?.results?.find((r: Raw) => r.iso_3166_1 === REGION)?.rating ?? null;
-  }
+  const ageRating = ratingFromRaw(type, raw);
+  const certification = ageRating && ageRating.source === "oficial" ? (ageRating.value === 0 ? "L" : String(ageRating.value)) : null;
 
   return {
     ...base,
+    ageRating,
     tagline: raw.tagline || null,
     genres: raw.genres ?? [],
     runtime: type === "movie" ? raw.runtime || null : raw.episode_run_time?.[0] ?? null,
@@ -183,7 +182,50 @@ function toProviders(region: Raw | undefined): WatchProviders | null {
   return total ? providers : null;
 }
 
-export type ArtworkMatch = { poster: string | null; backdrop: string | null; overview: string };
+/**
+ * Classificação a partir de release_dates (filmes) ou content_ratings (séries) do TMDB:
+ * a brasileira (oficial) ou, sem ela, a americana convertida (equivalente).
+ */
+function ratingFromRaw(type: TmdbType, raw: Raw): RatingInfo | null {
+  type Entry = { cert: string; descriptors: string[] };
+  const entries = (country: string): Entry[] => {
+    if (type === "movie") {
+      const r = (raw.release_dates?.results ?? []).find((x: Raw) => x.iso_3166_1 === country);
+      return (r?.release_dates ?? [])
+        .filter((d: Raw) => d.certification)
+        .map((d: Raw) => ({ cert: String(d.certification), descriptors: (d.descriptors ?? []).map(String) }));
+    }
+    const r = (raw.content_ratings?.results ?? []).find((x: Raw) => x.iso_3166_1 === country);
+    return r?.rating ? [{ cert: String(r.rating), descriptors: (r.descriptors ?? []).map(String) }] : [];
+  };
+  // Entre várias datas de lançamento, vale a classificação mais alta.
+  const pick = (list: Entry[], parse: (c: string) => RatingInfo["value"] | null) =>
+    list
+      .map((e) => ({ value: parse(e.cert), descriptors: e.descriptors }))
+      .filter((e): e is { value: RatingInfo["value"]; descriptors: string[] } => e.value !== null)
+      .sort((a, b) => b.value - a.value)[0];
+
+  const br = pick(entries(REGION), parseBrazilian);
+  if (br) return { value: br.value, source: "oficial", descriptors: br.descriptors };
+  const us = pick(entries("US"), parseUs);
+  if (us) return { value: us.value, source: "equivalente", descriptors: [] };
+  return null;
+}
+
+/** Só a classificação de um título (consulta leve, guardada por 7 dias). */
+export async function getTmdbRating(type: TmdbType, id: string | number): Promise<RatingInfo | null> {
+  if (isDemoCatalog) return mockRating(MOCK_TITLES.find((m) => m.type === type && m.id === String(id))?.certification);
+  const path = type === "movie" ? `/movie/${id}/release_dates` : `/tv/${id}/content_ratings`;
+  const data = await tmdb(path, {}, 60 * 60 * 24 * 7);
+  return data ? ratingFromRaw(type, type === "movie" ? { release_dates: data } : { content_ratings: data }) : null;
+}
+
+function mockRating(cert: string | null | undefined): RatingInfo | null {
+  const value = parseBrazilian(cert);
+  return value === null ? null : { value, source: "oficial", descriptors: [] };
+}
+
+export type ArtworkMatch = { id: number; poster: string | null; backdrop: string | null; overview: string };
 
 function normalize(text: string) {
   return text
@@ -209,8 +251,9 @@ export async function findMovieArtwork(title: string, year: string): Promise<Art
     const names = [r.title, r.original_title].filter(Boolean).map((n: string) => normalize(n));
     return r.poster_path && released && Math.abs(released - target) <= 1 && names.includes(wanted);
   });
-  if (!match) return null;
+  if (!match || match.adult) return null;
   return {
+    id: match.id,
     poster: imageUrl(match.poster_path, "w500"),
     backdrop: imageUrl(match.backdrop_path, "w1280"),
     overview: match.overview ?? "",

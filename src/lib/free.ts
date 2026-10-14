@@ -18,6 +18,23 @@ export const FREE_SHELVES: FreeShelf[] = [
 
 export const KIDS_SHELVES = FREE_SHELVES.filter((s) => s.kids);
 
+// Gênero de cada prateleira (ids do TMDB), usado na estimativa de classificação quando o filme não
+// tem classificação oficial: terror, policial e guerra são estimados como 16; o resto como 12.
+const SHELF_GENRES: Record<string, number[]> = {
+  terror: [27],
+  noir: [80],
+  ficcao: [878],
+  faroeste: [37],
+  drama: [18],
+  aventura: [12],
+  comedia: [35],
+  "comedia-hd": [35],
+  desenhos: [16],
+  "animacao-hd": [16],
+};
+const withShelfGenres = (key: string, items: Title[]) =>
+  items.map((t) => (t.genreIds.length ? t : { ...t, genreIds: SHELF_GENRES[key] ?? [] }));
+
 /**
  * Troca a miniatura da fonte pelo pôster (e pela sinopse em português) do TMDB quando acha o mesmo
  * filme: título exato e ano até 1 de diferença. Sem ano não há como confirmar, então fica a arte da fonte.
@@ -28,6 +45,7 @@ async function withArtwork<T extends Title>(item: T): Promise<T> {
   if (!match) return item;
   return {
     ...item,
+    tmdbMatchId: match.id,
     poster: match.poster ?? item.poster,
     backdrop: match.backdrop ?? match.poster ?? item.backdrop,
     overview: match.overview || item.overview,
@@ -48,10 +66,10 @@ export async function getFreeShelf(key: string, rows = 16): Promise<Title[]> {
 
   if (shelf.source === "commons") {
     const s = COMMONS_SHELVES.find((c) => c.key === key)!;
-    return enrich((await searchCommons(s.query, s.minMinutes, { rows })).items);
+    return enrich(withShelfGenres(key, (await searchCommons(s.query, s.minMinutes, { rows })).items));
   }
   const s = ARCHIVE_SHELVES.find((a) => a.key === key)!;
-  return enrich((await searchArchive(s.query, { window: ARCHIVE_ROW_WINDOW, rows })).items);
+  return enrich(withShelfGenres(key, (await searchArchive(s.query, { window: ARCHIVE_ROW_WINDOW, rows })).items));
 }
 
 /** Página do "Ver tudo": todos os aprovados daquela página da fonte, e se existe próxima página. */
@@ -64,7 +82,7 @@ export async function getFreeShelfPage(key: string, page: number): Promise<{ ite
   const result = commons
     ? await searchCommons(commons.query, commons.minMinutes, { page })
     : await searchArchive(ARCHIVE_SHELVES.find((a) => a.key === key)!.query, { window: ARCHIVE_PAGE_WINDOW, page });
-  return { items: await enrich(result.items), hasMore: result.hasMore };
+  return { items: await enrich(withShelfGenres(key, result.items)), hasMore: result.hasMore };
 }
 
 export async function getFreeTitle(type: FullMovieSource, id: string): Promise<TitleDetails | null> {

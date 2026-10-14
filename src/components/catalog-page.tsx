@@ -1,13 +1,16 @@
+import { requireProfile } from "@/lib/dal";
+import { forViewer, viewerOf } from "@/lib/ratings";
 import { getByGenre, getList } from "@/lib/tmdb";
 import { HeroSection } from "./hero-section";
 import { TitleRow } from "./title-row";
 
 export async function CatalogPage({ type, genres }: { type: "movie" | "tv"; genres: [number, string][] }) {
-  const [popular, topRated, ...byGenre] = await Promise.all([
-    getList(type, "popular"),
-    getList(type, "top_rated"),
-    ...genres.map(([id]) => getByGenre(type, [id])),
-  ]);
+  const viewer = viewerOf(await requireProfile());
+  const [popular, topRated, ...byGenre] = await Promise.all(
+    [getList(type, "popular"), getList(type, "top_rated"), ...genres.map(([id]) => getByGenre(type, [id]))].map((list) =>
+      list.then((items) => forViewer(items, viewer)),
+    ),
+  );
   return (
     <>
       <HeroSection items={popular} />

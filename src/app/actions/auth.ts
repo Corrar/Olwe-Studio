@@ -29,7 +29,7 @@ export async function signup(_: FormState, formData: FormData): Promise<FormStat
 
   const userId = crypto.randomUUID();
   await db.insert(users).values({ id: userId, name, email, passwordHash: await bcrypt.hash(password, 10) });
-  await db.insert(profiles).values({ id: crypto.randomUUID(), userId, name: name.split(" ")[0], avatar: "ember" });
+  await db.insert(profiles).values({ id: crypto.randomUUID(), userId, name: name.split(" ")[0], avatar: "ember", maxRating: 16 });
 
   await createSession(userId);
   redirect("/profiles");

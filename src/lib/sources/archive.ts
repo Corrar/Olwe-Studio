@@ -2,6 +2,7 @@
 // Só entram itens com licença declarada de domínio público ou Creative Commons, com um MP4 de pelo
 // menos 480p (qualidade de DVD).
 
+import { ADULT_CONTENT } from "../classification";
 import { isRecent, NEW_ADDITION_DAYS, qualityOf, type Title, type TitleDetails, type VideoSource } from "../types";
 import { fetchJson, first, mapLimit, safeUrl, stripHtml, truncate, type Raw } from "./shared";
 
@@ -100,12 +101,15 @@ export async function getArchiveDetails(id: string): Promise<TitleDetails | null
     .filter(Boolean)
     .slice(0, 4);
   const creator = stripHtml(first(meta.creator));
+  const description = stripHtml(first(meta.description));
+  // Conteúdo adulto fica fora do catálogo.
+  if (ADULT_CONTENT.test(`${title} ${subjects.join(" ")} ${description}`)) return null;
 
   return {
     id,
     type: "archive",
     title,
-    overview: stripHtml(first(meta.description)),
+    overview: description,
     poster: thumb(id),
     backdrop: thumb(id),
     year: yearOf(meta),

@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { fallbackGradient } from "@/components/artwork";
 import { Player } from "@/components/player";
+import { RatingBadge } from "@/components/rating-badge";
 import { getTitle } from "@/lib/catalog";
 import { requireProfile } from "@/lib/dal";
 import { getProgress } from "@/lib/library";
+import { accessFor, viewerOf } from "@/lib/ratings";
 import { isFullMovie, isMediaType } from "@/lib/types";
 
 export const metadata: Metadata = { title: "Assistindo" };
@@ -16,6 +18,10 @@ export default async function WatchPage({ params }: PageProps<"/watch/[type]/[id
   if (!isMediaType(type)) notFound();
   const title = await getTitle(type, decodeURIComponent(id));
   if (!title) notFound();
+
+  const access = await accessFor(title, viewerOf(profile));
+  if (access.status === "removed") notFound();
+  if (access.status === "blocked-for-profile") redirect(`/title/${title.type}/${encodeURIComponent(title.id)}`);
 
   const full = isFullMovie(title);
   const progress = full ? await getProgress(profile.id, title.type, title.id) : null;
@@ -40,6 +46,11 @@ export default async function WatchPage({ params }: PageProps<"/watch/[type]/[id
         <Link href={detailsHref} className="flex items-center gap-2 rounded-full bg-black/60 px-4 py-2 text-sm backdrop-blur hover:bg-black/80">
           ← <span className="max-w-[50vw] truncate">{title.title}</span>
         </Link>
+        {/* Como nas plataformas de streaming, a classificação aparece ao abrir o vídeo. */}
+        <span className="flex items-center gap-2 rounded-full bg-black/60 px-3 py-1.5 text-xs text-text/80 backdrop-blur">
+          <RatingBadge rating={access.rating} size="sm" />
+          {access.rating.descriptors.length > 0 ? access.rating.descriptors.join(", ") : "Classificação indicativa"}
+        </span>
         {!full && source && (
           <span className="rounded-full bg-black/60 px-3 py-2 text-xs text-text/80 backdrop-blur">
             Trailer · o filme completo não está disponível no Olwe

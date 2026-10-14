@@ -1,3 +1,5 @@
+import type { RatingInfo } from "./classification";
+
 /**
  * movie/tv vêm do TMDB (só sinopse e trailer).
  * archive (Internet Archive) e commons (Wikimedia Commons) são filmes completos com licença aberta.
@@ -21,6 +23,12 @@ export interface Title {
   quality?: Quality | null;
   /** Lançado (TMDB) ou adicionado à fonte (filmes completos) recentemente: mostra o selo "Novo". */
   isNew?: boolean;
+  /** Classificação indicativa (ClassInd). Preenchida antes de exibir o título a um perfil. */
+  ageRating?: RatingInfo | null;
+  /** Marcado como adulto pela fonte: nunca é exibido. */
+  adult?: boolean;
+  /** Filme do TMDB correspondente (filmes completos), usado para buscar a classificação oficial. */
+  tmdbMatchId?: number | null;
 }
 
 export type Quality = "4K" | "Full HD" | "HD" | "SD";

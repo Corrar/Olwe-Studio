@@ -3,13 +3,14 @@ import Link from "next/link";
 import { TitleCard } from "@/components/title-card";
 import { requireProfile } from "@/lib/dal";
 import { getWatchlist } from "@/lib/library";
+import { forViewer, viewerOf } from "@/lib/ratings";
 import { getTitlesByRef } from "@/lib/catalog";
 
 export const metadata: Metadata = { title: "Minha Lista" };
 
 export default async function MyListPage() {
   const profile = await requireProfile();
-  const titles = await getTitlesByRef(await getWatchlist(profile.id));
+  const titles = await forViewer(await getTitlesByRef(await getWatchlist(profile.id)), viewerOf(profile));
 
   return (
     <div className="px-4 pt-24 sm:px-10">
