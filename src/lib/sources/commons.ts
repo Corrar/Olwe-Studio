@@ -4,10 +4,11 @@
 // (VP9 + Opus), que têm boa qualidade de imagem e de som com tamanho razoável.
 
 import { qualityOf, type Title, type TitleDetails, type VideoSource } from "../types";
-import { cleanTitle, fetchJson, normalize, stripHtml, yearFromTitle, type Raw } from "./shared";
+import { fetchJson, normalize, safeUrl, stripHtml, truncate, yearFromTitle, type Raw } from "./shared";
 
 const API = "https://commons.wikimedia.org/w/api.php";
 const PAGE_SIZE = 50;
+const MAX_ID_LENGTH = 240;
 
 export type CommonsShelf = { key: string; label: string; query: string; minMinutes: number };
 
@@ -33,8 +34,10 @@ const VIDEO_PROPS = {
   prop: "videoinfo",
   viprop: "url|size|mime|mediatype|derivatives|extmetadata",
   viurlwidth: "1280",
-  viextmetadatafilter: "LicenseShortName|LicenseUrl|Artist|ObjectName|ImageDescription",
+  viextmetadatafilter: "LicenseShortName|LicenseUrl|Artist|Attribution|ObjectName|ImageDescription",
 };
+
+const isValidResponse = (body: Raw) => !body.error && (!!body.query || !!body.batchcomplete);
 
 function apiUrl(params: Record<string, string>) {
   const url = new URL(API);
@@ -48,16 +51,33 @@ function meta(v: Raw, key: string) {
   return stripHtml(String(v.extmetadata?.[key]?.value ?? ""));
 }
 
+// Sufixos de divulgação depois de " - " ("Official ... release", "Blender Open Movie", "16mm - Silent - UHD").
+// Um subtítulo de verdade ("Betty Boop - Minnie the Moocher") é mantido.
+const PROMO_SUFFIX =
+  /\s+[-–—|]\s+(official\b.*|.*\bopen movie\b.*|.*\brelease\b.*|.*\bfeature film\b.*|full (movie|film)\b.*|restored\b.*|remaster.*|\d{3,4}p\b.*|(hd|4k|uhd)\b.*|(16|35|super 8)\s?mm\b.*)$/i;
+
+/** Título exibido: sem ano, marcas de qualidade e sufixos de divulgação, mas com o subtítulo. */
 export function commonsTitle(fileName: string, objectName: string) {
   // Alguns arquivos trazem no nome do objeto marcações internas do Wikidata ("QS:P1476,..."): usa o nome do arquivo.
   const usable = objectName && !/QS:|\blabel\b/.test(objectName) ? objectName : "";
   const raw = usable || fileName.replace(/\.[a-z0-9]+$/i, "").replace(/_/g, " ");
-  return cleanTitle(raw.replace(/\bin (4k|hd|full hd)\b/gi, " ")).replace(/\s+(movie|film)$/i, "").trim() || raw;
+  const title = raw
+    .replace(/\s*[([](?:(?:18|19|20)\d{2}(?:\s+film)?|hd|4k|uhd|\d{3,4}p\d*)[)\]]\s*/gi, " ")
+    .replace(/\bin (4k|hd|full hd)\b/gi, " ")
+    .replace(PROMO_SUFFIX, "")
+    .replace(/\b(4k|uhd|\d{3,4}p\d*|full movie|full film)\b/gi, " ")
+    .replace(/[-–—|]\s*$/, "")
+    .replace(/\s+movie$/i, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+  return title || raw;
 }
 
 function playable(v: Raw): Raw[] {
   const derivatives: Raw[] = v.derivatives ?? [];
-  return PLAYABLE.map((key) => derivatives.find((d) => d.transcodekey === key)).filter((d): d is Raw => !!d?.src);
+  return PLAYABLE.map((key) => derivatives.find((d) => d.transcodekey === key)).filter(
+    (d): d is Raw => !!safeUrl(d?.src, ["wikimedia.org"]),
+  );
 }
 
 function sourcesOf(v: Raw): VideoSource[] {
@@ -68,6 +88,12 @@ function sourcesOf(v: Raw): VideoSource[] {
 function bestServed(v: Raw) {
   const best = playable(v)[0];
   return { width: Number(best?.width) || null, height: Number(best?.height) || null };
+}
+
+/** Miniatura em outra largura (o Commons serve larguras padrão como 500px e 1280px). */
+function thumbAt(url: unknown, width: number): string | null {
+  const safe = safeUrl(url, ["wikimedia.org"]);
+  return safe ? safe.replace(/\/\d+px-/, `/${width}px-`) : null;
 }
 
 type Candidate = { title: Title; height: number };
@@ -81,6 +107,7 @@ function toCandidate(page: Raw, minMinutes: number): Candidate | null {
   if (!(v.derivatives ?? []).some((d: Raw) => HD.has(d.transcodekey))) return null;
 
   const fileName = String(page.title ?? "").replace(/^File:/, "");
+  if (!fileName || fileName.length > MAX_ID_LENGTH) return null;
   const objectName = meta(v, "ObjectName");
   if (NOT_A_FILM.test(fileName) || NOT_A_FILM.test(objectName)) return null;
   const served = bestServed(v);
@@ -91,8 +118,8 @@ function toCandidate(page: Raw, minMinutes: number): Candidate | null {
       type: "commons",
       title: commonsTitle(fileName, objectName),
       overview: meta(v, "ImageDescription").slice(0, 600),
-      poster: v.thumburl ?? null,
-      backdrop: v.thumburl ?? null,
+      poster: thumbAt(v.thumburl, 500),
+      backdrop: thumbAt(v.thumburl, 1280),
       year: yearFromTitle(objectName) ?? yearFromTitle(fileName),
       rating: 0,
       genreIds: [],
@@ -103,8 +130,16 @@ function toCandidate(page: Raw, minMinutes: number): Candidate | null {
   };
 }
 
-/** Busca vídeos no Commons e devolve só os que passam nos filtros de licença, duração e qualidade. */
-export async function searchCommons(query: string, minMinutes: number, rows: number, page = 1): Promise<Title[]> {
+/**
+ * Busca vídeos no Commons e devolve os que passam nos filtros de licença, duração e qualidade.
+ * Cada página corresponde a 50 resultados da busca; `rows` limita a quantidade devolvida (fileiras),
+ * e sem `rows` vêm todos os aprovados da página (páginas de "Ver tudo", para nada ficar de fora).
+ */
+export async function searchCommons(
+  query: string,
+  minMinutes: number,
+  { page = 1, rows }: { page?: number; rows?: number } = {},
+): Promise<{ items: Title[]; hasMore: boolean }> {
   const data = await fetchJson(
     apiUrl({
       generator: "search",
@@ -115,23 +150,26 @@ export async function searchCommons(query: string, minMinutes: number, rows: num
       ...VIDEO_PROPS,
     }),
     "commons",
+    { isValid: isValidResponse },
   );
   const pages: Raw[] = [...(data?.query?.pages ?? [])].sort((a, b) => Number(a.index ?? 0) - Number(b.index ?? 0));
 
   // O mesmo filme costuma ter mais de um arquivo (4K, 1080p, versão antiga): fica o de maior resolução.
-  const byTitle = new Map<string, Candidate>();
+  // A chave inclui o ano para não juntar filmes diferentes com o mesmo nome.
+  const byKey = new Map<string, Candidate>();
   for (const p of pages) {
     const c = toCandidate(p, minMinutes);
     if (!c) continue;
-    const key = normalize(c.title.title);
-    const prev = byTitle.get(key);
-    if (!prev || c.height > prev.height) byTitle.set(key, c);
+    const key = `${normalize(c.title.title)}|${c.title.year ?? ""}`;
+    const prev = byKey.get(key);
+    if (!prev || c.height > prev.height) byKey.set(key, c);
   }
-  return [...byTitle.values()].slice(0, rows).map((c) => c.title);
+  const items = [...byKey.values()].map((c) => c.title);
+  return { items: rows ? items.slice(0, rows) : items, hasMore: !!data?.continue };
 }
 
 export function commonsTextQuery(text: string) {
-  const q = text.trim().replace(/["\\:]/g, " ").trim();
+  const q = text.trim().slice(0, 100).replace(/["\\:]/g, " ").trim();
   return q ? `filetype:video fileh:>719 ${q}` : null;
 }
 
@@ -140,13 +178,15 @@ function licenseLabel(name: string) {
 }
 
 export async function getCommonsDetails(id: string): Promise<TitleDetails | null> {
-  if (!id || id.length > 240 || /[|#<>[\]{}\u0000-\u001f]/.test(id)) return null;
-  const data = await fetchJson(apiUrl({ titles: `File:${id}`, ...VIDEO_PROPS }), "commons");
+  if (!id || id.length > MAX_ID_LENGTH || /[|#<>[\]{}\u0000-\u001f]/.test(id)) return null;
+  const data = await fetchJson(apiUrl({ titles: `File:${id}`, ...VIDEO_PROPS }), "commons", { isValid: isValidResponse });
   const page: Raw | undefined = data?.query?.pages?.[0];
   if (!page || page.missing) return null;
   const candidate = toCandidate(page, 0);
   if (!candidate) return null;
   const v: Raw = page.videoinfo[0];
+  // A licença CC BY pede a atribuição indicada pelo autor; sem ela, usa o campo de autoria.
+  const credit = meta(v, "Attribution") || meta(v, "Artist");
 
   return {
     ...candidate.title,
@@ -161,10 +201,11 @@ export async function getCommonsDetails(id: string): Promise<TitleDetails | null
     recommendations: [],
     providers: null,
     videoSources: sourcesOf(v),
-    sourceUrl: v.descriptionurl ?? `https://commons.wikimedia.org/wiki/File:${encodeURIComponent(id)}`,
+    sourceUrl:
+      safeUrl(v.descriptionurl, ["commons.wikimedia.org"]) ?? `https://commons.wikimedia.org/wiki/File:${encodeURIComponent(id)}`,
     sourceName: "Wikimedia Commons",
-    license: meta(v, "LicenseUrl") || null,
+    license: safeUrl(meta(v, "LicenseUrl"), ["creativecommons.org"]),
     licenseName: licenseLabel(meta(v, "LicenseShortName")),
-    credit: meta(v, "Artist").slice(0, 200) || null,
+    credit: credit ? truncate(credit, 300) : null,
   };
 }

@@ -64,6 +64,8 @@ export function Player({
       if (startAt > 0 && startAt < video.duration - 5) video.currentTime = startAt;
     };
     const interval = setInterval(() => !video.paused && save(), 10_000);
+    // O vídeo pode ter carregado os metadados antes desta função rodar (vem renderizado do servidor).
+    if (video.readyState >= HTMLMediaElement.HAVE_METADATA) onLoaded();
     video.addEventListener("loadedmetadata", onLoaded);
     video.addEventListener("pause", save);
     video.addEventListener("ended", save);

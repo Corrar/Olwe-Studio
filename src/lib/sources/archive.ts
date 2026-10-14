@@ -3,7 +3,7 @@
 // menos 480p (qualidade de DVD).
 
 import { qualityOf, type Title, type TitleDetails, type VideoSource } from "../types";
-import { fetchJson, first, mapLimit, stripHtml, type Raw } from "./shared";
+import { fetchJson, first, mapLimit, safeUrl, stripHtml, truncate, type Raw } from "./shared";
 
 const SEARCH = "https://archive.org/advancedsearch.php";
 const MIN_HEIGHT = 470;
@@ -25,8 +25,10 @@ export const ARCHIVE_SHELVES: ArchiveShelf[] = [
   { key: "desenhos", label: "Desenhos clássicos", query: "collection:(animationandcartoons) AND mediatype:(movies)" },
 ];
 
-export function isOpenLicenseUrl(url: unknown) {
-  return typeof url === "string" && /publicdomain|creativecommons/i.test(url);
+/** Aceita só endereços reais de licenças do creativecommons.org (licenças CC e marcas de domínio público). */
+export function openLicenseUrl(value: unknown): string | null {
+  const url = safeUrl(value, ["creativecommons.org"]);
+  return url && /^\/(licenses|publicdomain)\//i.test(new URL(url).pathname) ? url : null;
 }
 
 function licenseName(url: string) {
@@ -86,7 +88,8 @@ export async function getArchiveDetails(id: string): Promise<TitleDetails | null
   if (!/^[\w.-]+$/.test(id)) return null;
   const data = await getMetadata(id);
   const meta: Raw | undefined = data?.metadata;
-  if (!meta || data?.is_dark || !isOpenLicenseUrl(meta.licenseurl)) return null;
+  const license = openLicenseUrl(first(meta?.licenseurl));
+  if (!meta || data?.is_dark || !license) return null;
 
   const files: Raw[] = data?.files ?? [];
   const video = pickVideos(id, files);
@@ -96,7 +99,7 @@ export async function getArchiveDetails(id: string): Promise<TitleDetails | null
     .map((s: string) => s.trim())
     .filter(Boolean)
     .slice(0, 4);
-  const license = first(meta.licenseurl);
+  const creator = stripHtml(first(meta.creator));
 
   return {
     id,
@@ -123,33 +126,37 @@ export async function getArchiveDetails(id: string): Promise<TitleDetails | null
     sourceName: "Internet Archive",
     license,
     licenseName: licenseName(license),
-    credit: stripHtml(first(meta.creator)) || null,
+    credit: creator ? truncate(creator, 300) : null,
   };
 }
 
 /**
  * Busca no Internet Archive e mantém só itens com licença aberta e vídeo de pelo menos 480p.
  * A qualidade só aparece nos metadados de cada item, então cada candidato é consultado (com cache).
+ * `window` é quantos resultados da busca cada página cobre; `rows` limita a quantidade devolvida
+ * (fileiras). Sem `rows` vêm todos os aprovados da janela, para a paginação não pular filmes.
  */
-export async function searchArchive(query: string, rows: number, page = 1): Promise<Title[]> {
+export async function searchArchive(
+  query: string,
+  { window, page = 1, rows }: { window: number; page?: number; rows?: number },
+): Promise<{ items: Title[]; hasMore: boolean }> {
   const url = new URL(SEARCH);
   url.searchParams.set("q", query);
   for (const f of ["identifier", "licenseurl"]) url.searchParams.append("fl[]", f);
   url.searchParams.append("sort[]", "downloads desc");
-  url.searchParams.set("rows", String(rows * 2));
+  url.searchParams.set("rows", String(window));
   url.searchParams.set("page", String(page));
   url.searchParams.set("output", "json");
 
-  const data = await fetchJson(url, "archive");
+  const data = await fetchJson(url, "archive", { isValid: (body) => !!body.response });
   const ids: string[] = (data?.response?.docs ?? [])
-    .filter((d: Raw) => isOpenLicenseUrl(d.licenseurl))
+    .filter((d: Raw) => openLicenseUrl(first(d.licenseurl)))
     .map((d: Raw) => first(d.identifier))
     .filter(Boolean);
 
   const details = await mapLimit(ids, 6, getArchiveDetails);
-  return details
+  const items = details
     .filter((t): t is TitleDetails => !!t && t.videoSources.length > 0)
-    .slice(0, rows)
     .map(({ id, type, title, overview, poster, backdrop, year, rating, genreIds, quality }) => ({
       id,
       type,
@@ -162,9 +169,11 @@ export async function searchArchive(query: string, rows: number, page = 1): Prom
       genreIds,
       quality,
     }));
+  const total = Number(data?.response?.numFound ?? 0);
+  return { items: rows ? items.slice(0, rows) : items, hasMore: page * window < total };
 }
 
 export function archiveTextQuery(text: string) {
-  const q = text.trim().replace(/[()":\\[\]{}^~*?!+&|-]/g, " ").trim();
+  const q = text.trim().slice(0, 100).replace(/[()":\\[\]{}^~*?!+&|-]/g, " ").trim();
   return q ? `(title:(${q}) OR description:(${q})) AND mediatype:(movies) AND collection:(feature_films OR animationandcartoons)` : null;
 }

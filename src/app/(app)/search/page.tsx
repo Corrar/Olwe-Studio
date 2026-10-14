@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { TitleCard } from "@/components/title-card";
-import { searchAll } from "@/lib/catalog";
+import { searchFree } from "@/lib/free";
+import { searchTitles } from "@/lib/tmdb";
 import type { Title } from "@/lib/types";
 
 export const metadata: Metadata = { title: "Busca" };
@@ -20,10 +22,22 @@ function Results({ heading, note, items }: { heading: string; note: string; item
   );
 }
 
+async function FreeResults({ query }: { query: string }) {
+  return <Results heading="Filmes completos e grátis" note="Assista inteiro aqui no Olwe." items={await searchFree(query)} />;
+}
+
+async function TmdbResults({ query }: { query: string }) {
+  const items = await searchTitles(query);
+  return <Results heading="Filmes e séries" note="Só sinopse e trailer." items={items} />;
+}
+
+function Loading({ label }: { label: string }) {
+  return <p className="mb-10 animate-pulse text-sm text-muted">{label}</p>;
+}
+
 export default async function SearchPage({ searchParams }: PageProps<"/search">) {
   const { q } = await searchParams;
-  const query = typeof q === "string" ? q : "";
-  const { full, tmdb } = query ? await searchAll(query) : { full: [], tmdb: [] };
+  const query = typeof q === "string" ? q.trim().slice(0, 100) : "";
 
   return (
     <div className="px-4 pt-24 sm:px-10">
@@ -36,9 +50,17 @@ export default async function SearchPage({ searchParams }: PageProps<"/search">)
           "Busque por filmes e séries"
         )}
       </h1>
-      {query && full.length === 0 && tmdb.length === 0 && <p className="text-muted">Nada encontrado. Tente outro título.</p>}
-      <Results heading="Filmes completos e grátis" note="Assista inteiro aqui no Olwe." items={full} />
-      <Results heading="Filmes e séries" note="Só sinopse e trailer." items={tmdb} />
+      {query && (
+        <>
+          {/* Cada fonte aparece assim que responde: o TMDB costuma chegar antes dos filmes completos. */}
+          <Suspense fallback={<Loading label="Procurando filmes completos…" />}>
+            <FreeResults query={query} />
+          </Suspense>
+          <Suspense fallback={<Loading label="Procurando filmes e séries…" />}>
+            <TmdbResults query={query} />
+          </Suspense>
+        </>
+      )}
     </div>
   );
 }

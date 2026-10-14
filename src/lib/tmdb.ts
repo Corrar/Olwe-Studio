@@ -24,7 +24,7 @@ async function tmdb<T = Raw>(path: string, params: Record<string, string> = {}, 
   else url.searchParams.set("api_key", key);
 
   try {
-    const res = await fetch(url, { headers, next: { revalidate } });
+    const res = await fetch(url, { headers, next: { revalidate }, signal: AbortSignal.timeout(10_000) });
     if (res.status === 404) return null;
     if (!res.ok) throw new Error(`TMDB ${res.status} em ${path}`);
     return (await res.json()) as T;
@@ -193,16 +193,20 @@ function normalize(text: string) {
     .trim();
 }
 
-/** Procura um filme no TMDB pelo título original e ano, para usar o pôster e a sinopse em português. */
-export async function findMovieArtwork(title: string, year: string | null): Promise<ArtworkMatch | null> {
-  if (isDemoCatalog) return null;
-  const params: Record<string, string> = { query: title, include_adult: "false" };
-  if (year) params.primary_release_year = year;
-  const data = await tmdb("/search/movie", params, 60 * 60 * 24 * 7);
+/**
+ * Procura um filme no TMDB para usar o pôster e a sinopse em português. Exige título exatamente igual
+ * (nome em português ou original) e ano de lançamento com até 1 ano de diferença, para não colar a arte
+ * de outro filme num vídeo de licença aberta.
+ */
+export async function findMovieArtwork(title: string, year: string): Promise<ArtworkMatch | null> {
+  if (isDemoCatalog || !title) return null;
+  const data = await tmdb("/search/movie", { query: title, include_adult: "false" }, 60 * 60 * 24 * 7);
   const wanted = normalize(title);
+  const target = Number(year);
   const match = (data?.results ?? []).find((r: Raw) => {
+    const released = Number(String(r.release_date ?? "").slice(0, 4));
     const names = [r.title, r.original_title].filter(Boolean).map((n: string) => normalize(n));
-    return r.poster_path && names.some((n: string) => n === wanted || n.startsWith(wanted) || wanted.startsWith(n));
+    return r.poster_path && released && Math.abs(released - target) <= 1 && names.includes(wanted);
   });
   if (!match) return null;
   return {

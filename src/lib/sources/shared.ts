@@ -30,10 +30,33 @@ export function stripHtml(html: string) {
     .trim();
 }
 
-/** Ano entre parênteses ou colchetes no título, como em "The Kid (1921)". */
+/** Ano entre parênteses ou colchetes no título, como em "The Kid (1921)" ou "The General (1926 film)". */
 export function yearFromTitle(title: string): string | null {
-  const match = title.match(/[([]((?:18|19|20)\d{2})[)\]]/);
+  const match = title.match(/[([]((?:18|19|20)\d{2})(?:\s+film)?[)\]]/i);
   return match ? match[1] : null;
+}
+
+/**
+ * Devolve a URL só se for http(s) e de um dos domínios permitidos. Links vindos de metadados
+ * editáveis por terceiros (licença, página de origem) nunca viram "javascript:" ou domínios estranhos.
+ */
+export function safeUrl(value: unknown, hosts: string[]): string | null {
+  if (typeof value !== "string") return null;
+  try {
+    const url = new URL(value.trim());
+    if (url.protocol !== "https:" && url.protocol !== "http:") return null;
+    const host = url.hostname.toLowerCase();
+    return hosts.some((h) => host === h || host.endsWith(`.${h}`)) ? url.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Corta um texto longo no último espaço antes do limite. */
+export function truncate(text: string, max: number) {
+  if (text.length <= max) return text;
+  const cut = text.slice(0, max);
+  return `${cut.slice(0, Math.max(cut.lastIndexOf(" "), max * 0.6)).trimEnd()}…`;
 }
 
 /** Remove anos, marcas de qualidade e sufixos de divulgação do título. */
@@ -70,13 +93,30 @@ export async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) =>
   return out;
 }
 
-export async function fetchJson(url: URL, label: string, revalidate = DAY): Promise<Raw | null> {
+const TIMEOUT_MS = 10_000;
+
+type FetchOptions = {
+  revalidate?: number;
+  /** Respostas 200 com corpo de erro (comum na API do MediaWiki) não podem ser usadas. */
+  isValid?: (body: Raw) => boolean;
+};
+
+async function getJson(url: URL, init: RequestInit): Promise<Raw> {
+  const res = await fetch(url, { ...init, signal: AbortSignal.timeout(TIMEOUT_MS) });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return (await res.json()) as Raw;
+}
+
+export async function fetchJson(url: URL, label: string, { revalidate = DAY, isValid }: FetchOptions = {}): Promise<Raw | null> {
+  const headers = { accept: "application/json", "user-agent": USER_AGENT };
   try {
     // `next.revalidate` liga o cache de dados do Next; fora do Next a opção é ignorada.
-    const init = { headers: { accept: "application/json", "user-agent": USER_AGENT }, next: { revalidate } };
-    const res = await fetch(url, init as RequestInit);
-    if (!res.ok) throw new Error(`${label} ${res.status}`);
-    return (await res.json()) as Raw;
+    const body = await getJson(url, { headers, next: { revalidate } } as RequestInit);
+    if (!isValid || isValid(body)) return body;
+    // O cache pode estar guardando uma resposta de erro: busca de novo, sem cache.
+    const fresh = await getJson(url, { headers, cache: "no-store" });
+    if (isValid(fresh)) return fresh;
+    throw new Error(`resposta inválida: ${JSON.stringify(fresh).slice(0, 200)}`);
   } catch (err) {
     console.error(`[${label}]`, url.pathname, err);
     return null;

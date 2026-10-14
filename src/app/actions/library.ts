@@ -8,7 +8,7 @@ import { requireProfile } from "@/lib/dal";
 import { isMediaType, type MediaType } from "@/lib/types";
 
 export async function toggleWatchlist(mediaType: MediaType, itemId: string): Promise<boolean> {
-  if (!isMediaType(mediaType) || typeof itemId !== "string" || !itemId || itemId.length > 200) return false;
+  if (!isMediaType(mediaType) || typeof itemId !== "string" || !itemId || itemId.length > 255) return false;
   const profile = await requireProfile();
   const where = and(
     eq(watchlist.profileId, profile.id),

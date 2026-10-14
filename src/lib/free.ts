@@ -9,15 +9,21 @@ import type { FullMovieSource, Title, TitleDetails } from "./types";
 
 export type FreeShelf = { key: string; label: string; source: FullMovieSource; kids: boolean };
 
+// O perfil infantil só recebe a coleção de desenhos curada pelo Internet Archive. As buscas abertas
+// do Commons não têm moderação de conteúdo para crianças.
 export const FREE_SHELVES: FreeShelf[] = [
-  ...COMMONS_SHELVES.map((s) => ({ key: s.key, label: s.label, source: "commons" as const, kids: s.key === "animacao-hd" })),
+  ...COMMONS_SHELVES.map((s) => ({ key: s.key, label: s.label, source: "commons" as const, kids: false })),
   ...ARCHIVE_SHELVES.map((s) => ({ key: s.key, label: s.label, source: "archive" as const, kids: s.key === "desenhos" })),
 ];
 
 export const KIDS_SHELVES = FREE_SHELVES.filter((s) => s.kids);
 
-/** Troca a miniatura da fonte pelo pôster do TMDB quando acha o mesmo filme. */
+/**
+ * Troca a miniatura da fonte pelo pôster (e pela sinopse em português) do TMDB quando acha o mesmo
+ * filme: título exato e ano até 1 de diferença. Sem ano não há como confirmar, então fica a arte da fonte.
+ */
 async function withArtwork<T extends Title>(item: T): Promise<T> {
+  if (!item.year) return item;
   const match = await findMovieArtwork(cleanTitle(item.title), item.year);
   if (!match) return item;
   return {
@@ -30,17 +36,35 @@ async function withArtwork<T extends Title>(item: T): Promise<T> {
 
 const enrich = (items: Title[]) => mapLimit(items, 8, withArtwork);
 
-export async function getFreeShelf(key: string, rows = 20, page = 1): Promise<Title[]> {
+// Quantos resultados do Internet Archive cada página cobre (cada um exige uma consulta de metadados).
+const ARCHIVE_ROW_WINDOW = 32;
+const ARCHIVE_PAGE_WINDOW = 48;
+
+/** Fileira de uma prateleira (primeiros `rows` filmes). */
+export async function getFreeShelf(key: string, rows = 16): Promise<Title[]> {
   const shelf = FREE_SHELVES.find((s) => s.key === key);
   if (!shelf) return [];
-  if (isDemoCatalog) return page === 1 ? DEMO.filter((t) => t.type === shelf.source).slice(0, rows) : [];
+  if (isDemoCatalog) return DEMO.filter((t) => t.type === shelf.source).slice(0, rows);
 
   if (shelf.source === "commons") {
     const s = COMMONS_SHELVES.find((c) => c.key === key)!;
-    return enrich(await searchCommons(s.query, s.minMinutes, rows, page));
+    return enrich((await searchCommons(s.query, s.minMinutes, { rows })).items);
   }
   const s = ARCHIVE_SHELVES.find((a) => a.key === key)!;
-  return enrich(await searchArchive(s.query, rows, page));
+  return enrich((await searchArchive(s.query, { window: ARCHIVE_ROW_WINDOW, rows })).items);
+}
+
+/** Página do "Ver tudo": todos os aprovados daquela página da fonte, e se existe próxima página. */
+export async function getFreeShelfPage(key: string, page: number): Promise<{ items: Title[]; hasMore: boolean }> {
+  const shelf = FREE_SHELVES.find((s) => s.key === key);
+  if (!shelf) return { items: [], hasMore: false };
+  if (isDemoCatalog) return { items: page === 1 ? DEMO.filter((t) => t.type === shelf.source) : [], hasMore: false };
+
+  const commons = COMMONS_SHELVES.find((c) => c.key === key);
+  const result = commons
+    ? await searchCommons(commons.query, commons.minMinutes, { page })
+    : await searchArchive(ARCHIVE_SHELVES.find((a) => a.key === key)!.query, { window: ARCHIVE_PAGE_WINDOW, page });
+  return { items: await enrich(result.items), hasMore: result.hasMore };
 }
 
 export async function getFreeTitle(type: FullMovieSource, id: string): Promise<TitleDetails | null> {
@@ -57,11 +81,11 @@ export async function searchFree(text: string): Promise<Title[]> {
   const commonsQuery = commonsTextQuery(text);
   const archiveQuery = archiveTextQuery(text);
   const [commons, archive] = await Promise.all([
-    commonsQuery ? searchCommons(commonsQuery, 5, 15) : [],
-    archiveQuery ? searchArchive(archiveQuery, 15) : [],
+    commonsQuery ? searchCommons(commonsQuery, 5, { rows: 15 }) : { items: [] },
+    archiveQuery ? searchArchive(archiveQuery, { window: 20, rows: 10 }) : { items: [] },
   ]);
   // HD primeiro.
-  return enrich([...commons, ...archive]);
+  return enrich([...commons.items, ...archive.items]);
 }
 
 // Itens de demonstração (sem TMDB_API_KEY): fictícios e sem vídeo.
