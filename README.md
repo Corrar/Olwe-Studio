@@ -1,6 +1,7 @@
 # Olwe
 
-Plataforma de streaming de filmes e séries **sem anúncios**, com identidade visual própria.
+Plataforma de streaming de filmes e séries com dois planos: **Olwe Grátis** (com um anúncio curto antes
+dos filmes completos) e **Olwe Premium** (sem anúncios, pago pelo Mercado Pago). Identidade visual própria.
 Next.js 16 (App Router) + TypeScript + Tailwind CSS 4, backend nas rotas do próprio Next,
 banco libSQL/SQLite via Drizzle ORM e dois catálogos:
 
@@ -8,6 +9,18 @@ banco libSQL/SQLite via Drizzle ORM e dois catálogos:
   domínio público ou Creative Commons. Tocam inteiros no player do Olwe.
 - **Filmes e séries do [TMDB](https://www.themoviedb.org/)**: só sinopse, elenco e trailer, marcados como
   "Só sinopse e trailer", com a seção "Onde assistir" (dados do JustWatch) apontando para serviços legais.
+  As fileiras "grátis em outros apps" mostram o que está grátis no Brasil em serviços como Pluto TV, Vix e Plex.
+
+## Planos e anúncios
+
+- **Olwe Grátis**: um anúncio antes dos filmes completos (padrão VAST, Google IMA), da rede configurada em
+  `AD_TAG_URL`. Sem a variável, ninguém vê anúncio. **Perfis infantis nunca veem anúncios** (Resolução 163
+  do Conanda e CDC). Se o anúncio falhar, for bloqueado ou demorar mais de 8 segundos, o filme começa direto.
+- **Olwe Premium** (padrão R$ 9,90/mês, `PREMIUM_PRICE`): assinatura mensal no cartão (preapproval do
+  Mercado Pago) ou 30 dias avulsos no Pix. Cancelar a renovação mantém o Premium até o fim do período pago.
+- O webhook fica em `/api/webhooks/mercadopago` (eventos *Pagamentos* e *Planos e assinaturas*). Ele só avisa
+  o que mudou: o Olwe sempre consulta o Mercado Pago de novo antes de liberar o Premium. A página do Pix e a
+  volta do checkout também consultam, então tudo funciona mesmo antes de configurar o webhook.
 
 ## Funcionalidades
 
@@ -40,6 +53,10 @@ testar tudo sem chave. Crie a chave grátis em <https://www.themoviedb.org/setti
 | `DATABASE_URL` | `file:./data/olwe.db` local, ou `libsql://…turso.io` em produção. |
 | `DATABASE_AUTH_TOKEN` | Token do Turso (só em produção). |
 | `DEMO_VIDEO_URL` | Opcional: arquivo de vídeo tocado no player no lugar do trailer. |
+| `MERCADOPAGO_ACCESS_TOKEN` | Access Token do Mercado Pago. Vazio = assinaturas desligadas. |
+| `MERCADOPAGO_WEBHOOK_SECRET` | Assinatura secreta dos webhooks do Mercado Pago (recomendada). |
+| `PREMIUM_PRICE` | Preço mensal do Premium em reais (padrão `9.90`). |
+| `AD_TAG_URL` | Tag VAST da rede de anúncios (HTTPS). Vazio = sem anúncios. |
 
 ## Deploy (Vercel + Turso)
 

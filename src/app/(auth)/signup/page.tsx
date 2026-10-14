@@ -7,7 +7,7 @@ import { emailEnabled } from "@/lib/email";
 
 export const metadata: Metadata = { title: "Criar conta" };
 
-const PERKS = ["Grátis", "Sem anúncios", `Até ${MAX_PROFILES} perfis`];
+const PERKS = ["Grátis", "Premium sem anúncios", `Até ${MAX_PROFILES} perfis`];
 
 export default async function SignupPage({ searchParams }: PageProps<"/signup">) {
   // E-mail digitado na página inicial ("Vamos lá").
@@ -18,8 +18,8 @@ export default async function SignupPage({ searchParams }: PageProps<"/signup">)
       <h1 className="font-display text-3xl font-bold tracking-tight">Criar conta</h1>
       <p className="mt-2 text-muted">
         {emailEnabled()
-          ? "Filmes e séries sem nenhum anúncio. Depois do cadastro, enviamos um link para confirmar seu e-mail."
-          : "Filmes e séries sem nenhum anúncio. Leva menos de um minuto."}
+          ? "Filmes e séries grátis. Depois do cadastro, enviamos um link para confirmar seu e-mail."
+          : "Filmes e séries grátis. Leva menos de um minuto."}
       </p>
       <ul className="mb-7 mt-4 flex flex-wrap gap-2 text-xs font-medium">
         {PERKS.map((perk) => (

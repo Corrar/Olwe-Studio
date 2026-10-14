@@ -152,7 +152,7 @@ export function FreeIntro() {
     <p className="gutter flex max-w-4xl gap-2.5 text-sm text-muted">
       <Icon name="sparkles" size={18} className="mt-0.5 shrink-0 text-amber" />
       <span>
-        Filmes inteiros, grátis e sem anúncios, só de fontes com licença aberta (domínio público ou Creative Commons): vídeos
+        Filmes inteiros e grátis, só de fontes com licença aberta (domínio público ou Creative Commons): vídeos
         em HD do Wikimedia Commons e clássicos do Internet Archive. Cada card mostra a qualidade do vídeo.
       </span>
     </p>

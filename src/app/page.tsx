@@ -12,7 +12,7 @@ import { getSessionUserId } from "@/lib/session";
 import { getTopTrending, isDemoCatalog } from "@/lib/tmdb";
 import type { Title } from "@/lib/types";
 
-export const metadata: Metadata = { title: { absolute: "Olwe · Filmes e séries sem anúncios" } };
+export const metadata: Metadata = { title: { absolute: "Olwe · Filmes grátis, ou sem anúncios no Premium" } };
 
 // Visitante sem conta: vê só o que um perfil adulto padrão veria (até 16 anos; 18+ nunca aparece).
 const VISITOR: Viewer = { maxRating: 16, isKids: false, name: "" };
@@ -30,8 +30,8 @@ const PROMPT = "Pronto para assistir? Informe seu e-mail para criar sua conta.";
 const FEATURES: { icon: IconName; title: string; text: string; tags?: { icon: IconName; label: string }[]; span: string }[] = [
   {
     icon: "sparkles",
-    title: "Zero anúncios",
-    text: "Nada de intervalos, banners ou propaganda antes do filme. Você aperta play e a história começa.",
+    title: "Grátis, ou sem anúncios",
+    text: "No Olwe Grátis, só um anúncio curto antes do filme e nenhum no meio da história. No Premium, nenhum anúncio. Perfil infantil sempre sem anúncios.",
     span: "lg:col-span-3",
   },
   {
@@ -74,11 +74,11 @@ const FEATURES: { icon: IconName; title: string; text: string; tags?: { icon: Ic
 const FAQ = [
   {
     q: "O que é o Olwe?",
-    a: "O Olwe é um serviço de streaming sem anúncios. Você assiste a filmes completos e grátis de acervos com licença aberta e descobre o que está em alta no cinema e na TV, com sinopse, elenco e trailer.",
+    a: "O Olwe é um serviço de streaming. Você assiste a filmes completos e grátis de acervos com licença aberta e descobre o que está em alta no cinema e na TV, com sinopse, elenco e trailer.",
   },
   {
     q: "Quanto custa o Olwe?",
-    a: "Nada. Criar a conta e assistir no Olwe é grátis, e não existe anúncio em lugar nenhum: nem antes, nem durante, nem depois dos filmes.",
+    a: "Criar a conta e assistir é grátis: o Olwe Grátis se mantém com um anúncio curto antes dos filmes. Quem preferir sem anúncio nenhum assina o Olwe Premium, mensal no cartão ou 30 dias no Pix, e cancela quando quiser. Perfis infantis nunca veem anúncios.",
   },
   {
     q: "Onde posso assistir?",
@@ -189,7 +189,7 @@ export default async function LandingPage() {
         <div className="gutter relative z-10 flex flex-1 flex-col items-center justify-center pb-24 pt-10 text-center sm:pb-32">
           <p className="inline-flex animate-fade-up items-center gap-2 rounded-full bg-white/10 px-3.5 py-1.5 text-sm font-medium ring-1 ring-inset ring-white/15 backdrop-blur-md">
             <Icon name="sparkles" size={16} className="text-amber" />
-            Grátis e sem anúncios
+            Grátis, ou sem anúncios no Premium
           </p>
           <h1
             className="mt-6 max-w-4xl animate-fade-up text-balance font-display text-4xl font-bold leading-[1.05] tracking-tight [animation-delay:80ms] sm:text-6xl lg:text-7xl"

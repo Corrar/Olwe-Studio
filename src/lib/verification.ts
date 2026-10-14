@@ -32,7 +32,7 @@ export function resendWaitSeconds(sentAt: Date | null) {
  * Endereço público do site para o link do e-mail: APP_URL, o domínio de produção da Vercel ou,
  * em desenvolvimento e prévias, o endereço da própria requisição.
  */
-async function siteUrl() {
+export async function siteUrl() {
   if (process.env.APP_URL) return process.env.APP_URL.replace(/\/$/, "");
   if (process.env.VERCEL_ENV === "production" && process.env.VERCEL_PROJECT_PRODUCTION_URL) {
     return `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`;

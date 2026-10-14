@@ -19,6 +19,8 @@ export const users = sqliteTable(
     emailVerifiedAt: integer("email_verified_at", { mode: "timestamp" }),
     /** Último envio do e-mail de confirmação, para limitar reenvios. */
     verificationSentAt: integer("verification_sent_at", { mode: "timestamp" }),
+    /** Até quando a conta tem o Olwe Premium (sem anúncios). Null ou no passado = Olwe Grátis. */
+    premiumUntil: integer("premium_until", { mode: "timestamp" }),
     createdAt: createdAt(),
   },
   (t) => [uniqueIndex("users_email_idx").on(t.email)],
@@ -79,6 +81,35 @@ export const rateLimits = sqliteTable("rate_limits", {
   key: text("key").primaryKey(),
   count: integer("count").notNull().default(0),
   resetAt: integer("reset_at", { mode: "timestamp" }).notNull(),
+});
+
+/** Assinaturas do Premium no cartão (preapproval do Mercado Pago), uma por tentativa de assinar. */
+export const subscriptions = sqliteTable("subscriptions", {
+  /** ID da assinatura no Mercado Pago. */
+  id: text("id").primaryKey(),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  /** pending, authorized, paused ou cancelled (como no Mercado Pago). */
+  status: text("status").notNull(),
+  /** Próxima cobrança informada pelo Mercado Pago. */
+  nextPaymentAt: integer("next_payment_at", { mode: "timestamp" }),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().default(sql`(unixepoch())`),
+  createdAt: createdAt(),
+});
+
+/** Pagamentos avulsos (Pix de 30 dias). credited impede somar os mesmos dias duas vezes. */
+export const payments = sqliteTable("payments", {
+  /** ID do pagamento no Mercado Pago. */
+  id: text("id").primaryKey(),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  status: text("status").notNull(),
+  /** Dias de Premium que o pagamento dá. */
+  days: integer("days").notNull(),
+  credited: integer("credited", { mode: "boolean" }).notNull().default(false),
+  createdAt: createdAt(),
 });
 
 export type User = typeof users.$inferSelect;

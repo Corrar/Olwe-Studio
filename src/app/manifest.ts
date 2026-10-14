@@ -6,7 +6,7 @@ export default function manifest(): MetadataRoute.Manifest {
     id: "/",
     name: "Olwe",
     short_name: "Olwe",
-    description: "Filmes e séries sem anúncios, do seu jeito.",
+    description: "Filmes e séries grátis, ou sem anúncios no Premium.",
     lang: "pt-BR",
     dir: "ltr",
     start_url: "/",

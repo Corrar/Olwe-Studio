@@ -6,7 +6,8 @@ import { Icon } from "@/components/icons";
 import { Player } from "@/components/player";
 import { RatingBadge } from "@/components/rating-badge";
 import { getTitle } from "@/lib/catalog";
-import { requireProfile } from "@/lib/dal";
+import { adTagFor } from "@/lib/ads";
+import { requireProfile, requireUser } from "@/lib/dal";
 import { getProgress } from "@/lib/library";
 import { accessFor, viewerOf } from "@/lib/ratings";
 import { isFullMovie, isMediaType } from "@/lib/types";
@@ -14,6 +15,7 @@ import { isFullMovie, isMediaType } from "@/lib/types";
 export const metadata: Metadata = { title: "Assistindo" };
 
 export default async function WatchPage({ params }: PageProps<"/watch/[type]/[id]">) {
+  const user = await requireUser();
   const profile = await requireProfile();
   const { type, id } = await params;
   if (!isMediaType(type)) notFound();
@@ -56,6 +58,8 @@ export default async function WatchPage({ params }: PageProps<"/watch/[type]/[id
           backHref={detailsHref}
           note={full ? undefined : "Trailer · o filme completo não está disponível no Olwe"}
           poster={title.backdrop}
+          // Intervalo comercial só nos filmes completos, no Olwe Grátis e fora do perfil infantil.
+          adTag={full ? adTagFor(user, profile) : null}
         />
       ) : (
         <div

@@ -7,7 +7,7 @@ import { requireProfile } from "@/lib/dal";
 import { FREE_SHELVES, getFreeShelf, KIDS_SHELVES } from "@/lib/free";
 import { getContinueWatching, getWatchlist } from "@/lib/library";
 import { forViewer, viewerOf } from "@/lib/ratings";
-import { getByGenre, getList, getTopTrending, getTrending } from "@/lib/tmdb";
+import { getByGenre, getFreeElsewhere, getList, getTopTrending, getTrending } from "@/lib/tmdb";
 import type { Title } from "@/lib/types";
 
 export const metadata: Metadata = { title: "Início" };
@@ -92,9 +92,11 @@ export default async function BrowsePage() {
         )}
         <StreamedRow title="Filmes completos e grátis em HD" href="/free" load={() => allowed(getFreeShelf(FREE_SHELVES[0].key, 16))} />
         <StreamedRow title="Em alta na semana" load={trending} />
+        <StreamedRow title="Filmes grátis em outros apps" load={() => allowed(getFreeElsewhere("movie"))} />
         <StreamedRow top10 title="Top 10 séries hoje" load={() => allowed(getTopTrending("tv"))} />
         <StreamedRow title="Filmes populares" href="/movies" load={() => allowed(getList("movie", "popular"))} />
         <StreamedRow title="Séries populares" href="/series" load={() => allowed(getList("tv", "popular"))} />
+        <StreamedRow title="Séries grátis em outros apps" load={() => allowed(getFreeElsewhere("tv"))} />
         <StreamedRow title="Novidades nos cinemas" load={() => allowed(getList("movie", "now_playing"))} />
         <StreamedRow title="Filmes mais bem avaliados" load={() => allowed(getList("movie", "top_rated"))} />
         <StreamedRow title="Séries mais bem avaliadas" load={() => allowed(getList("tv", "top_rated"))} />

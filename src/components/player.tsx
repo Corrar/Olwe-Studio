@@ -17,6 +17,7 @@ import {
 } from "react";
 import type { RatingInfo } from "@/lib/classification";
 import type { MediaType } from "@/lib/types";
+import { AdBreak } from "./ad-break";
 import { Icon, type IconName } from "./icons";
 import { RatingBadge } from "./rating-badge";
 
@@ -42,6 +43,8 @@ type PlayerProps = Info & {
   trackProgress?: boolean;
   /** Imagem mostrada antes do primeiro quadro. */
   poster?: string | null;
+  /** Tag VAST do intervalo antes do filme (Olwe Grátis); null ou ausente = sem anúncio. */
+  adTag?: string | null;
 };
 
 function saveProgress(mediaType: MediaType, itemId: string, position: number, duration: number) {
@@ -54,7 +57,12 @@ function saveProgress(mediaType: MediaType, itemId: string, position: number, du
 }
 
 /** Arquivos próprios (Commons, Internet Archive, DEMO_VIDEO_URL) no player do Olwe; trailers no do YouTube. */
-export function Player({ source, poster, ...props }: PlayerProps) {
+export function Player({ source, poster, adTag, ...props }: PlayerProps) {
+  const [adDone, setAdDone] = useState(false);
+  // O anúncio só passa antes dos arquivos próprios: no YouTube, quem decide é o dono do vídeo.
+  if (source.kind === "files" && adTag && !adDone) {
+    return <AdBreak adTag={adTag} poster={poster} backHref={props.backHref} title={props.title} onDone={() => setAdDone(true)} />;
+  }
   return source.kind === "youtube" ? (
     <YouTubePlayer videoKey={source.key} {...props} />
   ) : (
