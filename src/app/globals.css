@@ -10,6 +10,12 @@
   --muted: #a3a1ab;
   --ember: #ff6a3d;
   --amber: #ffb547;
+
+  /* Medidas responsivas do layout (ver os utilitários gutter e card-w, mais abaixo). */
+  --gutter: 1rem;
+  --card-w: 7.25rem;
+  /* Altura da barra de abas do celular; zero onde ela não aparece (md em diante). */
+  --tab-bar-h: 4rem;
 }
 
 @theme inline {
@@ -25,14 +31,141 @@
   --font-display: "Sora Variable", "Inter Variable", system-ui, sans-serif;
 }
 
+@theme static {
+  /* Desaceleração longa: o movimento começa rápido e assenta suave (também como classe ease-out-expo). */
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@theme {
+  /* Monitores Full HD e TVs (1920px); telas 1440p e 4K (2560px). */
+  --breakpoint-3xl: 120rem;
+  --breakpoint-4xl: 160rem;
+
+  --animate-fade-in: fade-in 0.3s var(--ease-out-expo) both;
+  --animate-fade-up: fade-up 0.5s var(--ease-out-expo) both;
+  --animate-scale-in: scale-in 0.25s var(--ease-out-expo) both;
+  /* slide-up/slide-down percorrem a altura do próprio elemento: painéis, avisos e barras. */
+  --animate-slide-up: slide-up 0.35s var(--ease-out-expo) both;
+  --animate-slide-down: slide-down 0.35s var(--ease-out-expo) both;
+  --animate-shake: shake 0.4s ease-in-out both;
+  --animate-ken-burns: ken-burns 24s ease-in-out infinite alternate both;
+
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes fade-up {
+    from {
+      opacity: 0;
+      transform: translateY(0.75rem);
+    }
+  }
+  @keyframes scale-in {
+    from {
+      opacity: 0;
+      transform: scale(0.95);
+    }
+  }
+  @keyframes slide-up {
+    from {
+      opacity: 0;
+      transform: translateY(100%);
+    }
+  }
+  @keyframes slide-down {
+    from {
+      opacity: 0;
+      transform: translateY(-100%);
+    }
+  }
+  @keyframes shake {
+    20% {
+      transform: translateX(-0.5rem);
+    }
+    40% {
+      transform: translateX(0.4rem);
+    }
+    60% {
+      transform: translateX(-0.25rem);
+    }
+    80% {
+      transform: translateX(0.15rem);
+    }
+  }
+  @keyframes ken-burns {
+    from {
+      transform: scale(1);
+    }
+    to {
+      transform: scale(1.08) translate(-1%, -1%);
+    }
+  }
+}
+
+/* Hover só com mouse ou trackpad (no toque o hover "gruda"); touch para telas sem hover. */
+@custom-variant pointer-fine (@media (hover: hover) and (pointer: fine));
+@custom-variant touch (@media (hover: none));
+
+/* Pontos de quebra das medidas: sm 40rem, md 48rem, lg 64rem, xl 80rem, 3xl 120rem, 4xl 160rem. */
+@media (width >= 40rem) {
+  :root {
+    --gutter: 2.5rem;
+    --card-w: 9.5rem;
+  }
+}
+@media (width >= 48rem) {
+  :root {
+    --tab-bar-h: 0px;
+  }
+}
+@media (width >= 64rem) {
+  :root {
+    --card-w: 11rem;
+  }
+}
+@media (width >= 80rem) {
+  :root {
+    --card-w: 12rem;
+  }
+}
+/* TVs e telas grandes: tudo em rem cresce junto (texto, espaçamentos, cartões), visto de longe. */
+@media (width >= 120rem) {
+  :root {
+    --gutter: 4rem;
+    --card-w: 14.5rem;
+  }
+  html {
+    font-size: 112.5%;
+  }
+}
+@media (width >= 160rem) {
+  :root {
+    --gutter: 6rem;
+    --card-w: 19rem;
+  }
+  html {
+    font-size: 125%;
+  }
+}
+
 html {
   color-scheme: dark;
+  -webkit-tap-highlight-color: transparent;
+  /* O foco do teclado/controle remoto e as âncoras não ficam escondidos atrás do cabeçalho fixo nem da barra de abas. */
+  scroll-padding-top: calc(5rem + env(safe-area-inset-top));
+  scroll-padding-bottom: calc(var(--tab-bar-h) + env(safe-area-inset-bottom));
 }
 
 body {
   background: var(--ink);
   color: var(--text);
   font-family: var(--font-sans);
+}
+
+::selection {
+  background: color-mix(in oklab, var(--ember) 45%, transparent);
+  color: var(--text);
 }
 
 .text-gradient {
@@ -53,7 +186,149 @@ body {
   display: none;
 }
 
+/* Em rem para engrossar junto nas TVs. */
 :focus-visible {
-  outline: 2px solid var(--amber);
-  outline-offset: 2px;
+  outline: 0.125rem solid var(--amber);
+  outline-offset: 0.125rem;
+}
+
+/* Margem lateral das páginas; no celular deitado, respeita o recorte da câmera. */
+@utility gutter {
+  padding-left: max(var(--gutter), env(safe-area-inset-left));
+  padding-right: max(var(--gutter), env(safe-area-inset-right));
+}
+
+/* Largura dos cartões das fileiras (var(--card-w)); não encolhe dentro de flex. */
+@utility card-w {
+  width: var(--card-w);
+  flex-shrink: 0;
+}
+
+/* Áreas seguras (notch, barra de gestos) com viewport-fit=cover. */
+@utility pt-safe {
+  padding-top: env(safe-area-inset-top);
+}
+@utility pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+@utility pl-safe {
+  padding-left: env(safe-area-inset-left);
+}
+@utility pr-safe {
+  padding-right: env(safe-area-inset-right);
+}
+
+/* Espaço reservado com brilho passando enquanto o conteúdo carrega. */
+@utility skeleton {
+  background: linear-gradient(100deg, transparent 20%, rgb(255 255 255 / 0.06) 50%, transparent 80%) var(--surface);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.6s ease-in-out infinite;
+}
+
+/* Blocos que surgem ao rolar a página. Sem suporte (ou com movimento reduzido) ficam simplesmente
+   visíveis. Use em seções, não em cartões dentro de carrosséis horizontais. */
+@utility reveal {
+  @media (prefers-reduced-motion: no-preference) {
+    @supports (animation-timeline: view()) {
+      animation: reveal-up linear both;
+      animation-timeline: view();
+      animation-range: entry 0% entry 40%;
+    }
+  }
+}
+
+@keyframes skeleton-shimmer {
+  from {
+    background-position: 150% 0;
+  }
+  to {
+    background-position: -50% 0;
+  }
+}
+
+@keyframes reveal-up {
+  from {
+    opacity: 0;
+    transform: translateY(2rem);
+  }
+}
+
+/* Transições de página (React <ViewTransition>): a página inteira troca com um esmaecer curto. */
+::view-transition {
+  pointer-events: none;
+}
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 220ms;
+  animation-timing-function: ease-out;
+}
+
+/* Conteúdo que chega depois do carregamento: <ViewTransition enter="vt-slide-up" default="none">,
+   e o esqueleto que sai: <ViewTransition exit="vt-slide-down" default="none">. */
+::view-transition-new(.vt-slide-up) {
+  animation:
+    220ms ease-out 100ms both vt-fade,
+    450ms var(--ease-out-expo) both vt-rise;
+}
+::view-transition-old(.vt-slide-down) {
+  animation:
+    120ms ease-in both reverse vt-fade,
+    120ms ease-in both reverse vt-rise;
+}
+
+@keyframes vt-fade {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes vt-rise {
+  from {
+    transform: translateY(0.75rem);
+  }
+}
+
+/* Movimento reduzido: sem animações, transições, rolagem suave nem transições de página. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0s !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    transition-delay: 0s !important;
+    scroll-behavior: auto !important;
+  }
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation-duration: 0s !important;
+    animation-delay: 0s !important;
+  }
+}
+
+/* Vinheta de abertura (src/components/olwe-intro.tsx): já tocou nesta sessão, marcado pelo script do
+   <head> antes da primeira pintura. */
+html[data-intro-played] [data-olwe-intro] {
+  display: none;
+}
+
+/* A vinheta tem a própria camada nas transições de página: fica por cima do cabeçalho e das fileiras
+   enquanto a página troca, e entra sem esmaecer (as animações dela continuam no quadro ao vivo). */
+::view-transition-group(olwe-intro) {
+  z-index: 1000;
+  animation: none;
+}
+::view-transition-old(olwe-intro) {
+  display: none;
+}
+::view-transition-new(olwe-intro) {
+  animation: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *::details-content {
+    transition-duration: 0.01ms !important;
+    transition-delay: 0s !important;
+  }
 }

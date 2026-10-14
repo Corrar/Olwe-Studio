@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { fallbackGradient } from "@/components/artwork";
+import { Icon } from "@/components/icons";
 import { Player } from "@/components/player";
 import { RatingBadge } from "@/components/rating-badge";
 import { getTitle } from "@/lib/catalog";
@@ -32,42 +33,59 @@ export default async function WatchPage({ params }: PageProps<"/watch/[type]/[id
   const demoUrl = process.env.DEMO_VIDEO_URL;
   const source = full
     ? title.videoSources.length
-      ? ({ kind: "files", files: title.videoSources.map(({ src, type }) => ({ src, type })) } as const)
+      ? ({ kind: "files", files: title.videoSources.map(({ src, type, height }) => ({ src, type, height })) } as const)
       : null
     : demoUrl
-      ? ({ kind: "files", files: [{ src: demoUrl, type: "video/mp4" }] } as const)
+      ? ({ kind: "files", files: [{ src: demoUrl, type: "video/mp4", height: null }] } as const)
       : title.trailerKey
         ? ({ kind: "youtube", key: title.trailerKey } as const)
         : null;
 
   return (
     <div className="fixed inset-0 z-50 bg-black">
-      <div className="absolute left-4 right-4 top-4 z-10 flex flex-wrap items-center gap-2">
-        <Link href={detailsHref} className="flex items-center gap-2 rounded-full bg-black/60 px-4 py-2 text-sm backdrop-blur hover:bg-black/80">
-          ← <span className="max-w-[50vw] truncate">{title.title}</span>
-        </Link>
-        {/* Como nas plataformas de streaming, a classificação aparece ao abrir o vídeo. */}
-        <span className="flex items-center gap-2 rounded-full bg-black/60 px-3 py-1.5 text-xs text-text/80 backdrop-blur">
-          <RatingBadge rating={access.rating} size="sm" />
-          {access.rating.descriptors.length > 0 ? access.rating.descriptors.join(", ") : "Classificação indicativa"}
-        </span>
-        {!full && source && (
-          <span className="rounded-full bg-black/60 px-3 py-2 text-xs text-text/80 backdrop-blur">
-            Trailer · o filme completo não está disponível no Olwe
-          </span>
-        )}
-      </div>
       {source ? (
         // Só os filmes completos registram progresso ("Continuar assistindo").
-        <Player source={source} mediaType={title.type} itemId={title.id} startAt={startAt} trackProgress={full} />
+        <Player
+          source={source}
+          mediaType={title.type}
+          itemId={title.id}
+          startAt={startAt}
+          trackProgress={full}
+          title={title.title}
+          rating={access.rating}
+          backHref={detailsHref}
+          note={full ? undefined : "Trailer · o filme completo não está disponível no Olwe"}
+          poster={title.backdrop}
+        />
       ) : (
-        <div className="flex h-full flex-col items-center justify-center gap-4 px-6 text-center" style={{ background: fallbackGradient(title.id) }}>
-          <div className="absolute inset-0 bg-black/60" />
-          <p className="relative font-display text-3xl font-semibold">{title.title}</p>
+        <div
+          className="relative flex h-full flex-col items-center justify-center gap-4 px-6 text-center"
+          style={{ background: fallbackGradient(title.id) }}
+        >
+          <div className="absolute inset-0 bg-black/65" />
+          <Link
+            href={detailsHref}
+            aria-label={`Voltar para ${title.title}`}
+            className="gutter absolute left-0 top-0 z-10 pt-[max(0.75rem,env(safe-area-inset-top))] sm:pt-5"
+          >
+            <span className="grid size-11 place-items-center rounded-full transition hover:bg-white/15">
+              <Icon name="arrow-left" size={26} />
+            </span>
+          </Link>
+          <Icon name={full ? "film" : "alert"} size={44} className="relative animate-fade-in text-amber" />
+          <h1 className="relative animate-fade-up font-display text-3xl font-semibold sm:text-4xl">{title.title}</h1>
+          <p className="relative flex items-center gap-2 text-sm text-text/80">
+            <RatingBadge rating={access.rating} size="sm" />
+            {access.rating.descriptors.length > 0 ? access.rating.descriptors.join(", ") : "Classificação indicativa"}
+          </p>
           <p className="relative max-w-md text-text/80">
             {full ? "O arquivo de vídeo deste filme não está disponível no momento." : "Este título não tem trailer disponível."}
           </p>
-          <Link href={detailsHref} className="relative rounded-full bg-white/10 px-6 py-3 font-semibold hover:bg-white/20">
+          <Link
+            href={detailsHref}
+            className="relative mt-2 inline-flex min-h-12 items-center gap-2 rounded-full bg-white/10 px-6 font-semibold ring-1 ring-inset ring-white/15 transition hover:bg-white/20"
+          >
+            <Icon name="arrow-left" size={18} />
             Voltar
           </Link>
         </div>

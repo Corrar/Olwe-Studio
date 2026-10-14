@@ -11,6 +11,8 @@ export const users = sqliteTable(
     email: text("email").notNull(),
     name: text("name").notNull(),
     passwordHash: text("password_hash").notNull(),
+    /** Muda quando a senha é trocada: as sessões abertas em outros aparelhos deixam de valer. */
+    sessionVersion: integer("session_version").notNull().default(0),
     /** Conta criada com confirmação de e-mail obrigatória e ainda não confirmada. */
     emailVerificationPending: integer("email_verification_pending", { mode: "boolean" }).notNull().default(false),
     /** Quando o e-mail foi confirmado pelo link enviado no cadastro. */

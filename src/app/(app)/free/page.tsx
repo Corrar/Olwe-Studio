@@ -1,17 +1,18 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Suspense } from "react";
-import { HeroSection } from "@/components/hero-section";
-import { TitleCard } from "@/components/title-card";
+import { FreeIntro, GridSkeleton, PAGE_TOP, RowSkeleton, RowStack, Streamed, StreamedHero, TitleGrid } from "@/components/catalog-page";
 import { TitleRow } from "@/components/title-row";
 import { requireProfile } from "@/lib/dal";
-import { FREE_SHELVES, getFreeShelf, getFreeShelfPage, type FreeShelf } from "@/lib/free";
+import { FREE_SHELVES, getFreeShelf, getFreeShelfPage, KIDS_SHELVES, type FreeShelf } from "@/lib/free";
 import { forViewer, viewerOf, type Viewer } from "@/lib/ratings";
 
 export const metadata: Metadata = { title: "Filmes completos" };
 
 const ROW_SIZE = 16;
 const MAX_PAGE = 50;
+
+const PAGE_LINK =
+  "inline-flex min-h-11 items-center rounded-full bg-white/10 px-5 text-sm font-medium transition hover:bg-white/20 active:scale-[0.97]";
 
 async function Shelf({ shelf, viewer }: { shelf: FreeShelf; viewer: Viewer }) {
   const items = await forViewer(await getFreeShelf(shelf.key, ROW_SIZE), viewer);
@@ -24,94 +25,64 @@ async function ShelfPage({ shelf, page, viewer }: { shelf: FreeShelf; page: numb
   const hasMore = result.hasMore;
   return (
     <>
-      <div className="flex flex-wrap gap-4">
-        {items.map((t) => (
-          <TitleCard key={t.id} title={t} />
-        ))}
-      </div>
-      {items.length === 0 && (
+      {items.length > 0 ? (
+        <TitleGrid items={items} />
+      ) : (
         <p className="text-muted">Nenhum filme desta página passou nos filtros de licença e qualidade.</p>
       )}
-      <div className="mt-8 flex gap-3">
-        {page > 1 && (
-          <Link href={`/free?shelf=${shelf.key}&page=${page - 1}`} className="rounded-full bg-white/10 px-5 py-2 text-sm hover:bg-white/20">
-            ← Anterior
-          </Link>
-        )}
-        {hasMore && page < MAX_PAGE && (
-          <Link href={`/free?shelf=${shelf.key}&page=${page + 1}`} className="rounded-full bg-white/10 px-5 py-2 text-sm hover:bg-white/20">
-            Mais filmes →
-          </Link>
-        )}
-      </div>
+      {(page > 1 || (hasMore && page < MAX_PAGE)) && (
+        <nav aria-label="Páginas" className="mt-10 flex flex-wrap items-center gap-3">
+          {page > 1 && (
+            <Link href={`/free?shelf=${shelf.key}&page=${page - 1}`} className={PAGE_LINK}>
+              ← Anterior
+            </Link>
+          )}
+          <span className="px-1 text-sm text-muted">Página {page}</span>
+          {hasMore && page < MAX_PAGE && (
+            <Link href={`/free?shelf=${shelf.key}&page=${page + 1}`} className={PAGE_LINK}>
+              Mais filmes →
+            </Link>
+          )}
+        </nav>
+      )}
     </>
-  );
-}
-
-function GridSkeleton() {
-  return (
-    <div className="flex flex-wrap gap-4" aria-busy="true">
-      {Array.from({ length: 12 }, (_, i) => (
-        <div key={i} className="aspect-[2/3] w-36 animate-pulse rounded-lg bg-surface-2 sm:w-44 lg:w-48" />
-      ))}
-    </div>
-  );
-}
-
-async function Featured({ viewer }: { viewer: Viewer }) {
-  return <HeroSection items={await forViewer(await getFreeShelf(FREE_SHELVES[0].key, 8), viewer)} />;
-}
-
-function RowSkeleton({ label }: { label: string }) {
-  return (
-    <section className="px-4 sm:px-10" aria-busy="true">
-      <h2 className="mb-3 font-display text-lg font-semibold text-muted sm:text-xl">{label}</h2>
-      <div className="flex gap-3 overflow-hidden">
-        {Array.from({ length: 7 }, (_, i) => (
-          <div key={i} className="aspect-[2/3] w-36 shrink-0 animate-pulse rounded-lg bg-surface-2 sm:w-44 lg:w-48" />
-        ))}
-      </div>
-    </section>
   );
 }
 
 export default async function FreeMoviesPage({ searchParams }: PageProps<"/free">) {
   const { shelf: shelfKey, page: pageParam } = await searchParams;
   const viewer = viewerOf(await requireProfile());
-  const shelf = FREE_SHELVES.find((s) => s.key === shelfKey);
+  // Perfis infantis só recebem as prateleiras com curadoria infantil (as buscas abertas do Commons não têm).
+  const shelves = viewer.isKids ? KIDS_SHELVES : FREE_SHELVES;
+  const shelf = shelves.find((s) => s.key === shelfKey);
 
   // "Ver tudo" de uma prateleira, com paginação.
   if (shelf) {
     const page = Math.max(1, Math.min(MAX_PAGE, Number(pageParam) || 1));
     return (
-      <div className="px-4 pt-24 sm:px-10">
-        <Link href="/free" className="text-sm text-muted hover:text-amber">
+      <div className={`gutter pb-12 ${PAGE_TOP}`}>
+        <Link href="/free" className="inline-flex min-h-9 items-center text-sm text-muted transition hover:text-amber">
           ← Filmes completos
         </Link>
-        <h1 className="mb-6 mt-2 font-display text-2xl font-semibold">{shelf.label}</h1>
-        <Suspense key={page} fallback={<GridSkeleton />}>
+        <h1 className="mb-6 mt-1 font-display text-2xl font-bold tracking-tight sm:text-3xl">{shelf.label}</h1>
+        <Streamed key={page} fallback={<GridSkeleton />}>
           <ShelfPage shelf={shelf} page={page} viewer={viewer} />
-        </Suspense>
+        </Streamed>
       </div>
     );
   }
 
   return (
     <>
-      <Suspense fallback={<div className="h-[68vh] min-h-[420px] w-full animate-pulse bg-surface" />}>
-        <Featured viewer={viewer} />
-      </Suspense>
-      <div className="-mt-10 relative space-y-10">
-        <p className="px-4 text-sm text-muted sm:px-10">
-          Filmes inteiros, grátis e sem anúncios, só de fontes com licença aberta (domínio público ou Creative Commons):
-          vídeos em HD do Wikimedia Commons e clássicos do Internet Archive. Cada card mostra a qualidade do vídeo.
-        </p>
-        {FREE_SHELVES.map((s) => (
-          <Suspense key={s.key} fallback={<RowSkeleton label={s.label} />}>
+      <StreamedHero load={async () => forViewer(await getFreeShelf(shelves[0].key, 8), viewer)} />
+      <RowStack>
+        <FreeIntro />
+        {shelves.map((s) => (
+          <Streamed key={s.key} fallback={<RowSkeleton label={s.label} />}>
             <Shelf shelf={s} viewer={viewer} />
-          </Suspense>
+          </Streamed>
         ))}
-      </div>
+      </RowStack>
     </>
   );
 }

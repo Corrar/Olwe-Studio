@@ -19,6 +19,7 @@ export const MOVIE_GENRES: Record<number, string> = {
   53: "Suspense",
   10752: "Guerra",
   37: "Faroeste",
+  10770: "Cinema TV",
 };
 
 export const TV_GENRES: Record<number, string> = {
@@ -31,10 +32,16 @@ export const TV_GENRES: Record<number, string> = {
   10751: "Família",
   10762: "Infantil",
   9648: "Mistério",
+  10763: "Notícias",
+  10764: "Reality",
   10765: "Ficção científica e fantasia",
+  10766: "Novela",
+  10767: "Talk show",
   10768: "Guerra e política",
+  37: "Faroeste",
 };
 
+/** Nome do gênero; filmes completos (archive/commons) usam os gêneros de filme. */
 export function genreName(type: MediaType, id: number) {
-  return (type === "movie" ? MOVIE_GENRES : TV_GENRES)[id] ?? null;
+  return (type === "tv" ? TV_GENRES : MOVIE_GENRES)[id] ?? null;
 }

@@ -26,6 +26,10 @@ export function fallbackGradient(id: string | number) {
   return `linear-gradient(${(n * 37) % 360}deg, ${a}, ${b})`;
 }
 
+// Luz suave no alto e vinheta embaixo: o gradiente parece um pôster, não um bloco de cor.
+const SHEEN =
+  "radial-gradient(120% 70% at 20% 0%, rgb(255 255 255 / 0.16), transparent 60%), radial-gradient(140% 90% at 50% 120%, rgb(0 0 0 / 0.55), transparent 70%)";
+
 export function Artwork({
   title,
   variant,
@@ -38,11 +42,18 @@ export function Artwork({
   sizes: string;
 }) {
   const src = variant === "poster" ? title.poster : title.backdrop ?? title.poster;
+  // Fundo de destaque (LCP) é pré-carregado; pôsteres da primeira fileira só não esperam o scroll.
+  const loading = !priority ? {} : variant === "backdrop" ? { preload: true } : { loading: "eager" as const };
 
   const fallback = (
-    <div className="absolute inset-0 flex items-end p-3" style={{ background: fallbackGradient(title.id) }}>
+    <div className="absolute inset-0" style={{ background: fallbackGradient(title.id) }}>
+      <div className="absolute inset-0" style={{ background: SHEEN }} />
       {variant === "poster" && (
-        <span className="font-display text-base font-semibold leading-tight text-white drop-shadow">{title.title}</span>
+        <div className="absolute inset-0 flex items-center justify-center px-3 py-9 text-center">
+          <span className="line-clamp-4 text-balance font-display text-[0.9375rem] font-bold leading-tight tracking-tight text-white drop-shadow-[0_1px_8px_rgb(0_0_0/0.45)] sm:text-base 3xl:text-lg">
+            {title.title}
+          </span>
+        </div>
       )}
     </div>
   );
@@ -50,26 +61,29 @@ export function Artwork({
 
   // Imagens do TMDB passam pelo otimizador e já são pôsteres prontos.
   if (src.startsWith("https://image.tmdb.org/")) {
-    return <Image src={src} alt="" fill sizes={sizes} priority={priority} className="object-cover" />;
+    return <Image src={src} alt="" fill sizes={sizes} {...loading} className="object-cover" />;
   }
 
   // Miniaturas do Internet Archive costumam ser um quadro do filme (às vezes preto): ficam sobre o
-  // gradiente e, nos pôsteres, recebem o título por cima para o card nunca ficar vazio.
+  // gradiente e, nos pôsteres, recebem o título por cima para o card nunca ficar vazio. A faixa de
+  // baixo fica livre para os selos do cartão.
   return (
     <>
-      {fallback}
+      <div className="absolute inset-0" style={{ background: fallbackGradient(title.id) }} />
       <Image
         src={src}
         alt=""
         fill
         sizes={sizes}
-        priority={priority}
+        {...loading}
         unoptimized
-        className={variant === "backdrop" ? "object-cover blur-sm scale-105" : "object-cover"}
+        className={variant === "backdrop" ? "scale-105 object-cover blur-sm" : "object-cover"}
       />
       {variant === "poster" && (
-        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/60 to-transparent p-3 pt-10">
-          <span className="font-display text-base font-semibold leading-tight text-white">{title.title}</span>
+        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/95 via-black/65 to-transparent px-3 pb-9 pt-12">
+          <span className="line-clamp-3 text-balance font-display text-[0.9375rem] font-bold leading-tight text-white sm:text-base 3xl:text-lg">
+            {title.title}
+          </span>
         </div>
       )}
     </>

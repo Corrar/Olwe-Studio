@@ -26,3 +26,14 @@ export async function toggleWatchlist(mediaType: MediaType, itemId: string): Pro
   revalidatePath("/free");
   return !existing;
 }
+
+/** Adição rápida (prévia dos cartões): mesma validação, mas repetir não duplica nem remove o título da lista. */
+export async function addToWatchlist(mediaType: MediaType, itemId: string): Promise<boolean> {
+  if (!isMediaType(mediaType) || typeof itemId !== "string" || !itemId || itemId.length > 255) return false;
+  const profile = await requireProfile();
+  await db.insert(watchlist).values({ profileId: profile.id, mediaType, itemId }).onConflictDoNothing();
+  revalidatePath("/my-list");
+  revalidatePath("/browse");
+  revalidatePath("/free");
+  return true;
+}

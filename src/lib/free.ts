@@ -81,13 +81,14 @@ export async function getFreeTitle(type: FullMovieSource, id: string): Promise<T
   return details ? withArtwork(details) : null;
 }
 
-export async function searchFree(text: string): Promise<Title[]> {
+/** Busca nas fontes livres; perfis infantis buscam só na coleção de desenhos do Internet Archive. */
+export async function searchFree(text: string, { kids = false }: { kids?: boolean } = {}): Promise<Title[]> {
   if (isDemoCatalog) {
     const needle = text.trim().toLocaleLowerCase("pt-BR");
-    return needle ? DEMO.filter((t) => t.title.toLocaleLowerCase("pt-BR").includes(needle)) : [];
+    return needle ? DEMO.filter((t) => (!kids || t.type === "archive") && t.title.toLocaleLowerCase("pt-BR").includes(needle)) : [];
   }
-  const commonsQuery = commonsTextQuery(text);
-  const archiveQuery = archiveTextQuery(text);
+  const commonsQuery = kids ? null : commonsTextQuery(text);
+  const archiveQuery = archiveTextQuery(text, { kids });
   const [commons, archive] = await Promise.all([
     commonsQuery ? searchCommons(commonsQuery, 5, { rows: 15 }) : { items: [] },
     archiveQuery ? searchArchive(archiveQuery, { window: 20, rows: 10 }) : { items: [] },

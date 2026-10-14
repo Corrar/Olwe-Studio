@@ -216,9 +216,9 @@ export async function searchArchive(
   return { items: rows ? items.slice(0, rows) : items, hasMore: page * window < total };
 }
 
-export function archiveTextQuery(text: string) {
+/** Busca por texto; `kids` restringe à coleção de desenhos (curadoria infantil). */
+export function archiveTextQuery(text: string, { kids = false }: { kids?: boolean } = {}) {
   const q = text.trim().slice(0, 100).replace(/[()":\\[\]{}^~*?!+&|-]/g, " ").trim();
-  return q
-    ? `(title:(${q}) OR description:(${q})) AND mediatype:(movies) AND collection:(feature_films OR animationandcartoons) AND ${STREAMABLE_YEARS}`
-    : null;
+  const collections = kids ? "animationandcartoons" : "feature_films OR animationandcartoons";
+  return q ? `(title:(${q}) OR description:(${q})) AND mediatype:(movies) AND collection:(${collections}) AND ${STREAMABLE_YEARS}` : null;
 }

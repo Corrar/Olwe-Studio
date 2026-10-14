@@ -22,8 +22,9 @@ const cookieOptions = {
   maxAge: MAX_AGE,
 };
 
-export async function createSession(userId: string) {
-  const token = await new SignJWT({ userId })
+/** Abre a sessão; sessionVersion é a versão atual da conta (troca de senha encerra as sessões antigas). */
+export async function createSession(userId: string, sessionVersion: number) {
+  const token = await new SignJWT({ userId, sv: sessionVersion })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime(`${MAX_AGE}s`)
@@ -33,15 +34,22 @@ export async function createSession(userId: string) {
   store.delete(PROFILE_COOKIE);
 }
 
-export async function getSessionUserId(): Promise<string | null> {
+/** Sessão do cookie (conta e versão). Sessões antigas, sem versão, contam como versão 0. */
+export async function getSession(): Promise<{ userId: string; sessionVersion: number } | null> {
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
   if (!token) return null;
   try {
     const { payload } = await jwtVerify(token, secretKey(), { algorithms: ["HS256"] });
-    return typeof payload.userId === "string" ? payload.userId : null;
+    if (typeof payload.userId !== "string") return null;
+    return { userId: payload.userId, sessionVersion: typeof payload.sv === "number" ? payload.sv : 0 };
   } catch {
     return null;
   }
+}
+
+/** Conta da sessão sem consultar o banco (a versão é conferida em getCurrentUser). */
+export async function getSessionUserId(): Promise<string | null> {
+  return (await getSession())?.userId ?? null;
 }
 
 export async function deleteSession() {

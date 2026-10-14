@@ -1,0 +1,232 @@
+/* Vinheta de abertura do Olwe: mesma coreografia da vinheta original (tempos em segundos).
+   0.00 clarão · 0.05 anel se desenha · 0.70 play estala · 0.95 letras sobem · 1.55 brilho · 2.95 saída.
+   Só CSS: começa na primeira pintura, antes do JavaScript carregar. Arquivo global (o Tailwind do
+   projeto processa todo .css como global), por isso as classes e animações têm o prefixo olwe-intro. */
+
+.olwe-intro-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background: #0a0b0e;
+  color: #f3efe6;
+  font-family: "Outfit", "Sora Variable", system-ui, sans-serif;
+  cursor: pointer;
+  animation: olwe-intro-k-overlay-out 0.55s cubic-bezier(0.4, 0, 1, 1) 2.95s forwards;
+}
+
+/* Pular: keyframes com outro nome, senão a animação de saída (já concluída ou em curso) não recomeça. */
+.olwe-intro-exiting {
+  animation: olwe-intro-k-skip-out 0.3s ease-in forwards;
+}
+
+.olwe-intro-lockup {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: clamp(16px, 3.6vw, 40px);
+  animation: olwe-intro-k-lockup 3.5s ease-in-out forwards;
+  will-change: transform;
+}
+
+.olwe-intro-icon-wrap {
+  position: relative;
+  flex: none;
+}
+
+.olwe-intro-glow {
+  position: absolute;
+  inset: -70%;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(246, 132, 66, 0.6) 0%, rgba(246, 132, 66, 0) 62%);
+  filter: blur(14px);
+  opacity: 0;
+  pointer-events: none;
+  animation: olwe-intro-k-glow 1.5s ease-out forwards;
+}
+
+.olwe-intro-icon {
+  position: relative;
+  display: block;
+  width: clamp(72px, 13vw, 128px);
+  height: auto;
+  overflow: visible;
+}
+
+.olwe-intro-ring {
+  stroke-dasharray: 1 1;
+  stroke-dashoffset: 1;
+  animation: olwe-intro-k-ring 0.9s cubic-bezier(0.65, 0, 0.35, 1) 0.05s forwards;
+}
+
+.olwe-intro-play {
+  transform-box: fill-box;
+  transform-origin: 50% 50%;
+  transform: scale(0);
+  opacity: 0;
+  /* Mola (rigidez 520, amortecimento 19): passa um pouco do tamanho e volta. */
+  animation: olwe-intro-k-play 0.6s linear 0.7s forwards;
+}
+
+.olwe-intro-word {
+  display: flex;
+  overflow: hidden;
+  padding-bottom: 0.06em;
+  font-weight: 700;
+  font-size: clamp(60px, 12vw, 150px);
+  letter-spacing: -0.03em;
+  line-height: 1;
+  user-select: none;
+}
+
+.olwe-intro-letter {
+  display: inline-block;
+  opacity: 0;
+  transform: translateY(60%);
+  will-change: transform, opacity, filter;
+  animation:
+    olwe-intro-k-letter-in 0.65s cubic-bezier(0.2, 0.9, 0.25, 1) calc(0.95s + var(--i) * 0.07s) forwards,
+    olwe-intro-k-shine 0.5s ease-in-out calc(1.55s + var(--i) * 0.06s);
+}
+
+.olwe-intro-skip {
+  position: absolute;
+  right: calc(20px + env(safe-area-inset-right, 0px));
+  bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+  border: 1px solid rgba(243, 239, 230, 0.18);
+  border-radius: 999px;
+  background: rgba(243, 239, 230, 0.06);
+  padding: 8px 14px;
+  color: #8e8a82;
+  font: 500 13px/1 "Outfit", system-ui, sans-serif;
+  letter-spacing: 0.02em;
+  opacity: 0;
+  animation: olwe-intro-k-fade-in 0.4s ease 0.6s forwards;
+}
+
+.olwe-intro-skip:hover {
+  color: #f3efe6;
+  background: rgba(243, 239, 230, 0.12);
+}
+
+@keyframes olwe-intro-k-overlay-out {
+  to {
+    opacity: 0;
+    visibility: hidden;
+  }
+}
+
+@keyframes olwe-intro-k-skip-out {
+  to {
+    opacity: 0;
+    visibility: hidden;
+  }
+}
+
+@keyframes olwe-intro-k-lockup {
+  0%,
+  45.7% {
+    transform: scale(1);
+  }
+  55.7% {
+    transform: scale(1.025);
+  }
+  65.7%,
+  84.3% {
+    transform: scale(1);
+  }
+  100% {
+    transform: scale(1.07);
+  }
+}
+
+@keyframes olwe-intro-k-glow {
+  0% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  45% {
+    opacity: 0.9;
+    transform: scale(1.25);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.6);
+  }
+}
+
+@keyframes olwe-intro-k-ring {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes olwe-intro-k-play {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  25% {
+    opacity: 1;
+  }
+  40% {
+    transform: scale(1.14);
+  }
+  62% {
+    transform: scale(0.95);
+  }
+  80% {
+    transform: scale(1.02);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes olwe-intro-k-letter-in {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes olwe-intro-k-shine {
+  50% {
+    filter: brightness(1.85);
+  }
+}
+
+@keyframes olwe-intro-k-fade-in {
+  to {
+    opacity: 1;
+  }
+}
+
+/* Menos movimento: o logo aparece pronto e a tela some logo depois. */
+@media (prefers-reduced-motion: reduce) {
+  .olwe-intro-overlay {
+    animation: olwe-intro-k-overlay-out 0.3s ease-in 0.5s forwards !important;
+  }
+  .olwe-intro-lockup,
+  .olwe-intro-glow,
+  .olwe-intro-ring,
+  .olwe-intro-play,
+  .olwe-intro-letter,
+  .olwe-intro-skip {
+    animation: none !important;
+  }
+  .olwe-intro-ring {
+    stroke-dashoffset: 0;
+  }
+  .olwe-intro-play,
+  .olwe-intro-letter {
+    opacity: 1;
+    transform: none;
+  }
+  .olwe-intro-glow {
+    display: none;
+  }
+}

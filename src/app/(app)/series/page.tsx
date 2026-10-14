@@ -3,18 +3,7 @@ import { CatalogPage } from "@/components/catalog-page";
 
 export const metadata: Metadata = { title: "Séries" };
 
-export default function SeriesPage() {
-  return (
-    <CatalogPage
-      type="tv"
-      genres={[
-        [80, "Crime"],
-        [18, "Drama"],
-        [35, "Comédia"],
-        [10765, "Ficção científica e fantasia"],
-        [10759, "Ação e aventura"],
-        [99, "Documentais"],
-      ]}
-    />
-  );
+export default async function SeriesPage({ searchParams }: PageProps<"/series">) {
+  const { genre } = await searchParams;
+  return <CatalogPage type="tv" genre={genre} />;
 }

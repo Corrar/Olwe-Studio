@@ -1,8 +1,8 @@
 import "server-only";
 import { MOVIE_GENRES, TV_GENRES } from "./genres";
-import { MOCK_TITLES, mockList } from "./mock-catalog";
+import { MOCK_TITLES, mockList, mockSeason, mockTopTrending } from "./mock-catalog";
 import { estimateRating, isAdultsOnly, parseBrazilian, parseForeign, parseUs, type RatingInfo } from "./classification";
-import { isRecent, NEW_RELEASE_DAYS, type Title, type TitleDetails, type WatchProviders } from "./types";
+import { isRecent, NEW_RELEASE_DAYS, todayInBrazil, type Episode, type Title, type TitleDetails, type WatchProviders } from "./types";
 
 const API = "https://api.themoviedb.org/3";
 const LANGUAGE = "pt-BR";
@@ -100,6 +100,7 @@ function toTitle(raw: Raw, fallbackType?: TmdbType): Title | null {
     poster: imageUrl(raw.poster_path, "w500"),
     backdrop: imageUrl(raw.backdrop_path, "w1280"),
     year: date ? date.slice(0, 4) : null,
+    releaseDate: date || null,
     rating: Math.round((raw.vote_average ?? 0) * 10) / 10,
     genreIds: raw.genre_ids ?? raw.genres?.map((g: Raw) => g.id) ?? [],
     isNew: isRecent(date, NEW_RELEASE_DAYS),
@@ -364,4 +365,38 @@ export async function findMovieArtwork(title: string, year: string): Promise<Art
 
 export function imageUrl(path: string | null, size: "w342" | "w500" | "w780" | "w1280" | "original" | "w185") {
   return path ? `https://image.tmdb.org/t/p/${size}${path}` : null;
+}
+
+/** Mais vistos do dia, em ordem (até 20): quem chama aplica forViewer e fica com os 10 primeiros. */
+export async function getTopTrending(type: TmdbType): Promise<Title[]> {
+  if (isDemoCatalog) return mockTopTrending(type);
+  return toList(await tmdb(`/trending/${type}/day`), type).slice(0, 20);
+}
+
+/** Próximas estreias nos cinemas do Brasil: só datas futuras, da mais próxima para a mais distante. */
+export async function getUpcoming(): Promise<Title[]> {
+  const titles: Title[] = isDemoCatalog
+    ? MOCK_TITLES.filter((t) => t.type === "movie")
+    : (await Promise.all(["1", "2"].map((page) => tmdb("/movie/upcoming", { region: REGION, page })))).flatMap((data) =>
+        toList(data, "movie"),
+      );
+  const today = todayInBrazil();
+  const unique = new Map(titles.filter((t) => t.releaseDate && t.releaseDate > today).map((t) => [t.id, t]));
+  return [...unique.values()].sort((a, b) => String(a.releaseDate).localeCompare(String(b.releaseDate)));
+}
+
+/** Episódios de uma temporada. Quem chama já conferiu o acesso à série (accessFor). */
+export async function getSeason(tvId: string, season: number): Promise<Episode[] | null> {
+  if (!/^\d+$/.test(tvId) || !Number.isInteger(season) || season < 0) return null;
+  if (isDemoCatalog) return mockSeason(tvId, season);
+  const raw = await tmdb(`/tv/${tvId}/season/${season}`);
+  if (!raw) return null;
+  return (raw.episodes ?? []).map((e: Raw) => ({
+    number: e.episode_number,
+    name: e.name || `Episódio ${e.episode_number}`,
+    overview: e.overview ?? "",
+    still: imageUrl(e.still_path ?? null, "w780"),
+    runtime: e.runtime || null,
+    airDate: e.air_date || null,
+  }));
 }

@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { logout } from "@/app/actions/auth";
+import { IconBadge, Notice } from "@/components/auth-form";
+import { Icon } from "@/components/icons";
 import { getCurrentUser } from "@/lib/dal";
-import { verificationRequired } from "@/lib/verification";
-import { ResendButton } from "./resend-button";
+import { resendWaitSeconds, verificationRequired } from "@/lib/verification";
+import { ConfirmedButton, ResendButton } from "./resend-button";
 
 export const metadata: Metadata = { title: "Confirme seu e-mail" };
 
@@ -14,28 +16,32 @@ export default async function ConfirmEmailPage({ searchParams }: PageProps<"/con
   const { error } = await searchParams;
 
   return (
-    <div className="w-full max-w-md rounded-3xl border border-line bg-ink/70 p-8 text-center backdrop-blur">
-      <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-amber/15 text-3xl" aria-hidden>
-        ✉️
-      </div>
-      <h1 className="mb-3 font-display text-2xl font-semibold">Confirme seu e-mail</h1>
-      {error === "link" && (
-        <p role="alert" className="mb-4 rounded-xl bg-ember/15 px-4 py-3 text-sm text-ember">
-          Esse link de confirmação expirou ou não é válido. Peça um novo abaixo.
-        </p>
-      )}
-      <p className="text-muted">
-        {user.verificationSentAt ? "Enviamos um link de confirmação para" : "Vamos enviar um link de confirmação para"}{" "}
-        <strong className="text-text">{user.email}</strong>. Abra o e-mail e toque em <strong className="text-text">Confirmar e-mail</strong> para
-        liberar sua conta.
+    <div className="text-center">
+      <IconBadge icon="mail" pulse />
+      <h1 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">Confirme seu e-mail</h1>
+      <p className="mt-3 text-muted">{user.verificationSentAt ? "Enviamos um link de confirmação para" : "Vamos enviar um link de confirmação para"}</p>
+      <p className="mx-auto mt-2 w-fit max-w-full break-all rounded-full bg-white/[0.06] px-4 py-1.5 font-semibold text-text ring-1 ring-inset ring-white/10">
+        {user.email}
       </p>
-      <p className="mt-3 text-sm text-muted">O link vale por 24 horas. Não achou? Confira a caixa de spam.</p>
-      <div className="mt-6 flex flex-col gap-3">
-        <ResendButton />
-        <form action={logout}>
-          <button className="text-sm text-muted hover:text-text">Usar outra conta</button>
-        </form>
+      <p className="mt-3 text-pretty text-muted">
+        Abra o e-mail e toque em <strong className="text-text">Confirmar e-mail</strong> para liberar sua conta.
+      </p>
+      <p className="mb-6 mt-2 text-sm text-muted">O link vale por 24 horas. Não achou? Confira a caixa de spam.</p>
+
+      {error === "link" && <Notice tone="error">Esse link de confirmação expirou ou não é válido. Peça um novo abaixo.</Notice>}
+
+      <div className="space-y-3">
+        <ConfirmedButton />
+        {/* Um envio novo (outra aba, outro aparelho) recomeça a contagem. */}
+        <ResendButton key={user.verificationSentAt?.getTime() ?? 0} wait={resendWaitSeconds(user.verificationSentAt)} />
       </div>
+
+      <form action={logout} className="mt-6 border-t border-line pt-5">
+        <button className="inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-sm text-muted transition-colors hover:text-text">
+          <Icon name="logout" size={16} />
+          Usar outra conta
+        </button>
+      </form>
     </div>
   );
 }

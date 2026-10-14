@@ -19,6 +19,8 @@ export interface Title {
   poster: string | null;
   backdrop: string | null;
   year: string | null;
+  /** Data de lançamento (filmes) ou de estreia (séries), "AAAA-MM-DD". */
+  releaseDate?: string | null;
   rating: number;
   genreIds: number[];
   /** Qualidade do vídeo que o Olwe toca (só filmes completos): "4K", "Full HD", "HD" ou "SD". */
@@ -56,6 +58,18 @@ export interface Season {
   name: string;
   episodeCount: number;
   year: string | null;
+}
+
+export interface Episode {
+  number: number;
+  name: string;
+  overview: string;
+  /** Imagem do episódio (16:9), URL completa. */
+  still: string | null;
+  /** Duração em minutos. */
+  runtime: number | null;
+  /** Data de exibição, "AAAA-MM-DD". */
+  airDate: string | null;
 }
 
 export interface WatchProvider {
@@ -112,6 +126,14 @@ export function isRecent(date: unknown, days: number, now = Date.now()): boolean
   if (typeof date !== "string" || !date) return false;
   const time = Date.parse(date.includes("T") || date.length <= 10 ? date : date.replace(" ", "T") + "Z");
   return Number.isFinite(time) && time <= now && now - time <= days * 24 * 60 * 60 * 1000;
+}
+
+/** Data de hoje no Brasil, "AAAA-MM-DD", para comparar com datas de lançamento. */
+export function todayInBrazil(now = new Date()): string {
+  const parts = new Intl.DateTimeFormat("en", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" })
+    .formatToParts(now)
+    .reduce<Record<string, string>>((acc, p) => ({ ...acc, [p.type]: p.value }), {});
+  return `${parts.year}-${parts.month}-${parts.day}`;
 }
 
 /** Rótulo de qualidade pela resolução do arquivo que será tocado. */
