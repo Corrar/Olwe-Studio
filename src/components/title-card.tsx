@@ -53,7 +53,7 @@ export function TitleCard({
 }) {
   const name = title.year ? `${title.title} (${title.year})` : title.title;
   // Os selos da capa também são ditos no nome do link (o leitor de tela não os lê sozinhos dentro dele).
-  const availability = isFullMovie(title) ? `Filme completo, grátis${title.quality ? `, ${title.quality}` : ""}` : "Só sinopse e trailer";
+  const availability = isFullMovie(title) ? `Filme completo, ${title.premiumOnly ? "exclusivo Premium" : "grátis"}${title.quality ? `, ${title.quality}` : ""}` : "Só sinopse e trailer";
   const label = [
     rank ? `${rank}º lugar: ${name}` : name,
     title.ageRating ? ratingText(title.ageRating) : null,

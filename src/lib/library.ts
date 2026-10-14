@@ -25,7 +25,7 @@ export async function getContinueWatching(profileId: string) {
   return db.query.progress.findMany({
     where: and(
       eq(progress.profileId, profileId),
-      inArray(progress.mediaType, ["archive", "commons"]),
+      inArray(progress.mediaType, ["archive", "commons", "licensed"]),
       gt(progress.position, 0),
       // or() com parênteses próprios: um "or" solto no SQL escaparia do filtro por perfil.
       or(eq(progress.duration, 0), lt(progress.position, sql`${progress.duration} * 0.95`)),

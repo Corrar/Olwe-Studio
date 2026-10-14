@@ -5,6 +5,7 @@ import { TitleCard } from "@/components/title-card";
 import { getTitlesByRef } from "@/lib/catalog";
 import { requireProfile } from "@/lib/dal";
 import { FREE_SHELVES, getFreeShelf, KIDS_SHELVES } from "@/lib/free";
+import { getLicensedShelf } from "@/lib/licensed";
 import { getContinueWatching, getWatchlist } from "@/lib/library";
 import { forViewer, viewerOf } from "@/lib/ratings";
 import { getByGenre, getFreeElsewhere, getList, getTopTrending, getTrending } from "@/lib/tmdb";
@@ -56,6 +57,7 @@ export default async function BrowsePage() {
       <>
         <StreamedHero load={animMovies} />
         <RowStack>
+          <StreamedRow title="Filmes no Olwe" href="/free" load={() => allowed(getLicensedShelf())} />
           <StreamedRow
             title="Desenhos completos e grátis"
             href="/free"
@@ -90,6 +92,8 @@ export default async function BrowsePage() {
         {listRefs.length > 0 && (
           <StreamedRow title="Minha Lista" href="/my-list" load={() => allowed(getTitlesByRef(listRefs.slice(0, 20)))} />
         )}
+        <StreamedRow title="Filmes licenciados no Olwe" href="/free" load={() => allowed(getLicensedShelf({ tier: "free" }))} />
+        <StreamedRow title="Exclusivos Premium" href="/plans" load={() => allowed(getLicensedShelf({ tier: "premium" }))} />
         <StreamedRow title="Filmes completos e grátis em HD" href="/free" load={() => allowed(getFreeShelf(FREE_SHELVES[0].key, 16))} />
         <StreamedRow title="Em alta na semana" load={trending} />
         <StreamedRow title="Filmes grátis em outros apps" load={() => allowed(getFreeElsewhere("movie"))} />

@@ -22,7 +22,7 @@ export function AvailabilityBadge({
   size = "md",
   quality = true,
 }: {
-  title: Pick<Title, "type" | "quality">;
+  title: Pick<Title, "type" | "quality" | "premiumOnly">;
   size?: BadgeSize;
   quality?: boolean;
 }) {
@@ -37,10 +37,17 @@ export function AvailabilityBadge({
   }
   return (
     <span className="inline-flex flex-wrap items-center gap-1">
-      <span className={`${cls} bg-emerald-400 text-ink shadow-sm shadow-black/40`}>
-        {size !== "xs" && <Icon name="play" size={size === "md" ? 12 : 10} className="shrink-0" />}
-        Filme completo · grátis
-      </span>
+      {title.premiumOnly ? (
+        <span className={`${cls} bg-brand text-ink shadow-sm shadow-black/40`}>
+          {size !== "xs" && <Icon name="sparkles" size={size === "md" ? 12 : 10} className="shrink-0" />}
+          {size === "xs" ? "Premium" : "Filme completo · Premium"}
+        </span>
+      ) : (
+        <span className={`${cls} bg-emerald-400 text-ink shadow-sm shadow-black/40`}>
+          {size !== "xs" && <Icon name="play" size={size === "md" ? 12 : 10} className="shrink-0" />}
+          Filme completo · grátis
+        </span>
+      )}
       {quality && <QualityBadge title={title} size={size} />}
     </span>
   );

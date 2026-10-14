@@ -9,6 +9,7 @@ import { Icon, type IconName } from "@/components/icons";
 import { db } from "@/db";
 import { profiles } from "@/db/schema";
 import { MAX_PROFILES } from "@/lib/avatars";
+import { isAdminEmail } from "@/lib/admin";
 import { activeSubscription, dateLabel, isPremium, priceLabel } from "@/lib/billing";
 import { clampLimit, limitLabel } from "@/lib/classification";
 import { requireProfile, requireUser } from "@/lib/dal";
@@ -156,6 +157,23 @@ export default async function AccountPage() {
             ))}
           </ul>
         </Section>
+
+        {isAdminEmail(user.email) && !current.isKids && (
+          <Section
+            id="admin"
+            icon="settings"
+            title="Administração"
+            order={3}
+            action={
+              <Link href="/admin/titles" className={PILL_LINK}>
+                <Icon name="film" size={16} />
+                Catálogo licenciado
+              </Link>
+            }
+          >
+            <p className="text-sm text-muted">Cadastre filmes licenciados, defina o prazo da licença e escolha se ficam no Grátis ou só no Premium.</p>
+          </Section>
+        )}
 
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-line/60 p-5 sm:p-6">
           <p className="text-sm text-muted">Sair desconecta a conta deste aparelho.</p>

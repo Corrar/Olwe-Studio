@@ -11,6 +11,20 @@ banco libSQL/SQLite via Drizzle ORM e dois catálogos:
   "Só sinopse e trailer", com a seção "Onde assistir" (dados do JustWatch) apontando para serviços legais.
   As fileiras "grátis em outros apps" mostram o que está grátis no Brasil em serviços como Pluto TV, Vix e Plex.
 
+## Catálogo licenciado
+
+Filmes com licença própria do Olwe (contrato com distribuidora, autorização do autor ou licença aberta),
+cadastrados no painel **`/admin/titles`**, aberto só para as contas de `ADMIN_EMAILS` (num perfil adulto).
+
+- Vídeo por **link oficial do YouTube** (do dono dos direitos) ou **arquivo MP4/WebM** em HTTPS. Os arquivos
+  tocam no player do Olwe, com o anúncio do Olwe Grátis antes.
+- **Janela da licença** (início e último dia): fora dela o filme some sozinho do app. O painel avisa as
+  licenças que vencem nos próximos 30 dias.
+- **Plano**: Grátis + Premium, ou **só Premium** (exclusivo para assinantes).
+- **Classificação indicativa** obrigatória (L a 16; 18 não é aceito), seguida pelos perfis e pelo infantil.
+- Com o **ID do TMDB**, pôster, sinopse, ano, duração e gêneros deixados em branco vêm de lá.
+- Rascunhos (não publicados) só aparecem no painel. As anotações internas nunca aparecem no app.
+
 ## Planos e anúncios
 
 - **Olwe Grátis**: um anúncio antes dos filmes completos (padrão VAST, Google IMA), da rede configurada em
@@ -57,6 +71,7 @@ testar tudo sem chave. Crie a chave grátis em <https://www.themoviedb.org/setti
 | `MERCADOPAGO_WEBHOOK_SECRET` | Assinatura secreta dos webhooks do Mercado Pago (recomendada). |
 | `PREMIUM_PRICE` | Preço mensal do Premium em reais (padrão `9.90`). |
 | `AD_TAG_URL` | Tag VAST da rede de anúncios (HTTPS). Vazio = sem anúncios. |
+| `ADMIN_EMAILS` | E-mails (separados por vírgula) que abrem o painel do catálogo licenciado. |
 
 ## Deploy (Vercel + Turso)
 

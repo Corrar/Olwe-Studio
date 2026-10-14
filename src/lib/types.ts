@@ -3,8 +3,11 @@ import type { RatingInfo } from "./classification";
 /**
  * movie/tv vêm do TMDB (só sinopse e trailer).
  * archive (Internet Archive) e commons (Wikimedia Commons) são filmes completos com licença aberta.
+ * licensed são filmes completos com licença própria do Olwe, cadastrados no painel (/admin/titles).
  */
-export type MediaType = "movie" | "tv" | "archive" | "commons";
+export type MediaType = "movie" | "tv" | "archive" | "commons" | "licensed";
+
+export const MEDIA_TYPES = ["movie", "tv", "archive", "commons", "licensed"] as const;
 
 export type FullMovieSource = "archive" | "commons";
 
@@ -35,6 +38,8 @@ export interface Title {
   tmdbMatchId?: number | null;
   /** Não foi possível verificar o filme no TMDB agora (falha na consulta): não é exibido. */
   ratingUnconfirmed?: boolean;
+  /** Filme licenciado só para assinantes do Olwe Premium. */
+  premiumOnly?: boolean;
 }
 
 export type Quality = "4K" | "Full HD" | "HD" | "SD";
@@ -107,14 +112,16 @@ export interface TitleDetails extends Title {
   licenseName: string | null;
   /** Autoria exigida pelas licenças CC BY. */
   credit: string | null;
+  /** Filme completo publicado no YouTube pelo dono dos direitos (tocado no player do YouTube). */
+  youtubeKey?: string | null;
 }
 
 export function isFullMovie(t: Pick<Title, "type">) {
-  return t.type === "archive" || t.type === "commons";
+  return t.type === "archive" || t.type === "commons" || t.type === "licensed";
 }
 
 export function isMediaType(value: string): value is MediaType {
-  return value === "movie" || value === "tv" || value === "archive" || value === "commons";
+  return (MEDIA_TYPES as readonly string[]).includes(value);
 }
 
 /** Prazos do selo "Novo". */
