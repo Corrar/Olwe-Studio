@@ -71,6 +71,9 @@ testar tudo sem chave. Crie a chave grátis em <https://www.themoviedb.org/setti
 | `DATABASE_URL` | `file:./data/olwe.db` local, ou `libsql://…turso.io` em produção. |
 | `DATABASE_AUTH_TOKEN` | Token do Turso (só em produção). |
 | `DEMO_VIDEO_URL` | Opcional: arquivo de vídeo tocado no player no lugar do trailer. |
+| `SMTP_USER` / `SMTP_PASS` | E-mails de confirmação e de troca de senha por SMTP. Grátis e sem domínio com uma conta do Gmail e uma [senha de app](https://myaccount.google.com/apppasswords). Opcionais: `SMTP_HOST`, `SMTP_PORT`, `SMTP_FROM`. |
+| `RESEND_API_KEY` / `RESEND_FROM` | Alternativa ao SMTP pelo Resend. Na Vercel só liga com `RESEND_FROM` de um domínio verificado (sem domínio, o Resend só entrega para o dono da conta). |
+| `EMAIL_DAILY_LIMIT` | Cota diária de e-mails do Olwe (padrão 90). |
 | `MERCADOPAGO_ACCESS_TOKEN` | Access Token do Mercado Pago. Vazio = assinaturas desligadas. |
 | `MERCADOPAGO_WEBHOOK_SECRET` | Assinatura secreta dos webhooks do Mercado Pago (recomendada). |
 | `PREMIUM_PRICE` | Preço mensal do Premium em reais (padrão `9.90`). |

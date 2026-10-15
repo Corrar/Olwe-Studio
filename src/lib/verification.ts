@@ -11,8 +11,8 @@ const PURPOSE = "verify-email";
 export const RESEND_COOLDOWN_SECONDS = 60;
 /** Validade do link de confirmação. */
 export const LINK_LIFETIME_SECONDS = 24 * 60 * 60;
-/** Cota diária de e-mails (cadastros e trocas de senha), abaixo da cota do Resend. */
-export const EMAILS_PER_DAY = Number(process.env.RESEND_DAILY_LIMIT) || 90;
+/** Cota diária de e-mails (cadastros e trocas de senha), abaixo da cota do provedor (Gmail ou Resend). */
+export const EMAILS_PER_DAY = Number(process.env.EMAIL_DAILY_LIMIT || process.env.RESEND_DAILY_LIMIT) || 90;
 
 /**
  * A confirmação só é exigida para contas criadas com ela (cadastro com o envio de e-mails configurado)
@@ -56,7 +56,7 @@ const verificationMessage = (link: string) =>
 
 /**
  * Envia o link de confirmação, no máximo um por minuto por conta. A vaga do envio é reservada no banco
- * antes de chamar o Resend, então cliques simultâneos não mandam vários e-mails; todo envio conta na
+ * antes de chamar o provedor de e-mail, então cliques simultâneos não mandam vários e-mails; todo envio conta na
  * cota diária (menos o do cadastro, que já foi contado). Se não sair, a vaga é devolvida.
  */
 export async function sendVerificationEmail(
