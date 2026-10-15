@@ -40,7 +40,22 @@ type Phase = "ready" | "loading" | "playing";
  * o celular só toca anúncio com som depois de um gesto. Qualquer erro, bloqueio ou demora leva direto
  * ao filme: o anúncio nunca impede de assistir.
  */
-export function AdBreak({ adTag, poster, backHref, title, onDone }: { adTag: string; poster?: string | null; backHref: string; title: string; onDone: () => void }) {
+export function AdBreak({
+  adTag,
+  poster,
+  backHref,
+  title,
+  onStarted,
+  onDone,
+}: {
+  adTag: string;
+  poster?: string | null;
+  backHref: string;
+  title: string;
+  /** Cada anúncio que começa a passar (impressão, para o painel). */
+  onStarted?: () => void;
+  onDone: () => void;
+}) {
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const cleanup = useRef<() => void>(() => {});
@@ -96,6 +111,7 @@ export function AdBreak({ adTag, poster, backHref, title, onDone }: { adTag: str
       manager.addEventListener(ima.AdEvent.Type.STARTED, () => {
         clearTimeout(timer);
         setPhase("playing");
+        onStarted?.();
       });
       try {
         manager.init(window.innerWidth, window.innerHeight, ima.ViewMode.NORMAL);

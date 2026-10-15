@@ -8,6 +8,7 @@ import { licensedTitles, type LicensedTitle } from "@/db/schema";
 import { requireAdmin } from "@/lib/admin";
 import { dateLabel } from "@/lib/billing";
 import { ratingLabel, isAgeRating } from "@/lib/classification";
+import { AdminNav } from "../admin-nav";
 
 export const metadata: Metadata = { title: "Catálogo licenciado" };
 
@@ -36,6 +37,7 @@ export default async function LicensedTitlesPage({ searchParams }: PageProps<"/a
 
   return (
     <div className={`gutter mx-auto max-w-5xl pb-12 ${PAGE_TOP}`}>
+      <AdminNav current="titles" />
       <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="font-display text-3xl font-bold tracking-tight sm:text-4xl">Catálogo licenciado</h1>

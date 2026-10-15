@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useRef } from "react";
+import { useActionState, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { deleteLicensedTitle, saveLicensedTitle } from "@/app/actions/licensed";
 import { Icon } from "@/components/icons";
@@ -30,7 +30,28 @@ export type TitleFormValues = {
   licenseStart: string;
   licenseEnd: string;
   notes: string;
+  costModel: CostModel;
+  costValue: string;
+  revenueShare: string;
   published: boolean;
+};
+
+export type CostModel = "none" | "flat" | "monthly" | "per_view" | "share";
+
+const COST_MODELS: [CostModel, string][] = [
+  ["none", "Sem custo (domínio público, licença aberta, cortesia)"],
+  ["flat", "Valor fixo pelo contrato"],
+  ["monthly", "Valor por mês"],
+  ["per_view", "Valor por visualização"],
+  ["share", "Porcentagem da receita do filme"],
+];
+
+const COST_HINTS: Record<CostModel, string> = {
+  none: "O filme não entra nas licenças a pagar do painel.",
+  flat: "O painel divide o valor pelos dias da licença (sem data de fim, por 12 meses a partir do início).",
+  monthly: "Proporcional aos dias em que a licença vale dentro do período escolhido no painel.",
+  per_view: "Cada visualização conta a partir de 30 segundos assistidos, como no YouTube.",
+  share: "Receita do filme = receita do período dividida pelo tempo assistido de cada filme completo.",
 };
 
 const LABEL = "block text-sm text-muted";
@@ -79,6 +100,7 @@ function SaveButton() {
 
 export function TitleForm({ values, genres, mux }: { values: TitleFormValues; genres: [number, string][]; mux: boolean }) {
   const [state, action] = useActionState(saveLicensedTitle, undefined);
+  const [costModel, setCostModel] = useState(values.costModel);
   const videoRef = useRef<HTMLInputElement>(null);
   const onSubmit = useManualSubmit(action);
   const err = (name: string) => (state?.field === name ? state.error : undefined);
@@ -222,6 +244,38 @@ export function TitleForm({ values, genres, mux }: { values: TitleFormValues; ge
           <Field name="licenseEnd" label="Fim da licença (último dia)" hint="Em branco: sem prazo. Depois dele, o filme some sozinho." error={err("licenseEnd")}>
             {input("licenseEnd", { type: "date" })}
           </Field>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+          <Field name="costModel" label="Custo da licença" hint={COST_HINTS[costModel]} error={err("costModel")}>
+            <select
+              id="costModel"
+              name="costModel"
+              value={costModel}
+              onChange={(e) => setCostModel(e.target.value as CostModel)}
+              className={FIELD}
+            >
+              {COST_MODELS.map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </Field>
+          {(costModel === "flat" || costModel === "monthly" || costModel === "per_view") && (
+            <Field
+              name="costValue"
+              label={costModel === "flat" ? "Valor do contrato (R$)" : costModel === "monthly" ? "Valor por mês (R$)" : "Valor por visualização (R$)"}
+              hint="Ex.: 1.500,00"
+              error={err("costValue")}
+            >
+              {input("costValue", { inputMode: "decimal", placeholder: "0,00", maxLength: 20 })}
+            </Field>
+          )}
+          {costModel === "share" && (
+            <Field name="revenueShare" label="Porcentagem (%)" hint="Ex.: 50 para metade da receita do filme." error={err("revenueShare")}>
+              {input("revenueShare", { inputMode: "numeric", placeholder: "50", maxLength: 3 })}
+            </Field>
+          )}
         </div>
         <Field name="notes" label="Anotações internas" hint="Contrato, contato, repasse. Ninguém além do painel vê.">
           <textarea id="notes" name="notes" rows={3} maxLength={4000} defaultValue={values.notes} className={FIELD} />

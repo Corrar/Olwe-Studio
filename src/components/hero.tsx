@@ -14,11 +14,18 @@ export type HeroSlide = { backdrop: ReactNode; poster: ReactNode };
 const INTERVAL_MS = 9000;
 
 // Medidas compartilhadas com o esqueleto (nada pula quando o destaque chega). No celular, o pôster
-// centralizado define a altura; do sm em diante é um painel 16:9 limitado pela altura da tela.
-const FRAME = "relative isolate w-full overflow-hidden sm:h-[clamp(22rem,56.25vw,80svh)] sm:portrait:h-[clamp(26rem,62svh,56rem)]";
+// centralizado define a altura; do sm em diante é um painel 16:9 limitado pela altura da tela, que cresce
+// quando o texto não cabe (telas baixas, zoom alto, títulos longos) em vez de subir por baixo do cabeçalho.
+const FRAME =
+  "relative isolate w-full overflow-hidden sm:flex sm:min-h-[clamp(22rem,56.25vw,80svh)] sm:flex-col sm:portrait:min-h-[clamp(26rem,62svh,56rem)]";
 const CONTENT =
-  "gutter flex flex-col items-center pb-14 text-center sm:h-full sm:flex-row sm:items-end sm:justify-between sm:gap-6 sm:pb-20 sm:pt-0 sm:text-left lg:pb-24";
-const TOP = { default: "pt-[calc(4.5rem+env(safe-area-inset-top))]", compact: "pt-4" };
+  "gutter flex flex-col items-center pb-14 text-center sm:flex-1 sm:flex-row sm:items-end sm:justify-between sm:gap-6 sm:pb-20 sm:text-left lg:pb-24";
+// Espaço do cabeçalho fixo acima do texto. compact: nas páginas de Filmes e Séries, o nome da página e os
+// gêneros ficam sobre o topo do destaque (no celular, acima dele).
+const TOP = {
+  default: "pt-[calc(4.5rem+env(safe-area-inset-top))] sm:pt-[calc(5.5rem+env(safe-area-inset-top))]",
+  compact: "pt-4 sm:pt-[calc(12rem+env(safe-area-inset-top))] xl:pt-[calc(9rem+env(safe-area-inset-top))]",
+};
 // O pôster encolhe em telas baixas para os botões caberem na primeira tela.
 const POSTER =
   "relative aspect-[2/3] w-[clamp(9rem,calc((100svh_-_24rem)*2/3),min(64vw,17rem))] shrink-0 overflow-hidden rounded-2xl sm:hidden";

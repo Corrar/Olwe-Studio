@@ -165,13 +165,22 @@ export default async function AccountPage() {
             title="Administração"
             order={3}
             action={
-              <Link href="/admin/titles" className={PILL_LINK}>
-                <Icon name="film" size={16} />
-                Catálogo licenciado
-              </Link>
+              <div className="flex flex-wrap gap-2">
+                <Link href="/admin" className={PILL_LINK}>
+                  <Icon name="gauge" size={16} />
+                  Painel
+                </Link>
+                <Link href="/admin/titles" className={PILL_LINK}>
+                  <Icon name="film" size={16} />
+                  Catálogo licenciado
+                </Link>
+              </div>
             }
           >
-            <p className="text-sm text-muted">Cadastre filmes licenciados, defina o prazo da licença e escolha se ficam no Grátis ou só no Premium.</p>
+            <p className="text-sm text-muted">
+              Acompanhe lucro, licenças a pagar, usuários e visualizações no painel. No catálogo, cadastre filmes licenciados, o prazo e o custo de
+              cada licença.
+            </p>
           </Section>
         )}
 
