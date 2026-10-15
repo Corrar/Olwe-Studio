@@ -19,13 +19,17 @@ function smtpConfig(): Smtp | null {
   return { host, port: Number(process.env.SMTP_PORT) || 465, user, pass };
 }
 
+const RESEND_SANDBOX_FROM = "Olwe <onboarding@resend.dev>";
+const resendFrom = () => process.env.RESEND_FROM?.trim() || RESEND_SANDBOX_FROM;
+
 /**
- * Resend sem domínio próprio (remetente padrão onboarding@resend.dev) só entrega para o dono da conta do
+ * Resend sem domínio próprio (remetente de teste @resend.dev) só entrega para o dono da conta do
  * Resend. Publicado na Vercel, ligar a confirmação assim prenderia todo cadastro novo numa tela de
- * confirmação cujo e-mail nunca chega: só vale com RESEND_FROM ou fora da Vercel (testes locais).
+ * confirmação cujo e-mail nunca chega: só vale com um RESEND_FROM de outro domínio, ou fora da Vercel
+ * (testes locais).
  */
 function resendUsable() {
-  return !!process.env.RESEND_API_KEY && (!!process.env.RESEND_FROM || !process.env.VERCEL);
+  return !!process.env.RESEND_API_KEY && (!/@resend\.dev\b/i.test(resendFrom()) || !process.env.VERCEL);
 }
 
 export function emailEnabled() {
@@ -116,7 +120,7 @@ export async function sendEmail(email: Email): Promise<boolean> {
     const res = await fetch(`${api}/emails`, {
       method: "POST",
       headers: { authorization: `Bearer ${key}`, "content-type": "application/json" },
-      body: JSON.stringify({ from: process.env.RESEND_FROM || "Olwe <onboarding@resend.dev>", to: [to], subject, html, text }),
+      body: JSON.stringify({ from: resendFrom(), to: [to], subject, html, text }),
       signal: AbortSignal.timeout(10_000),
       cache: "no-store",
     });
