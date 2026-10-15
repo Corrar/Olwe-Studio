@@ -97,8 +97,9 @@ export function Hero({
   }, [rotating, current, count]);
 
   const item = items[current];
-  // Sem destaque, só o espaço do cabeçalho fixo (as fileiras sobem um pouco sobre o destaque).
-  if (!item) return <div className={compactTop ? "h-14" : "h-[calc(8rem+env(safe-area-inset-top))]"} />;
+  // Sem destaque, só o espaço do cabeçalho fixo (as fileiras sobem um pouco sobre o destaque). compact: do xl
+  // em diante, também o do nome da página e dos gêneros, que ficam sobre esse espaço.
+  if (!item) return <div className={compactTop ? "h-14 xl:h-[calc(11.5rem+env(safe-area-inset-top))]" : "h-[calc(8rem+env(safe-area-inset-top))]"} />;
 
   const go = (i: number) => setIndex((i + count) % count);
   const details = `/title/${item.type}/${encodeURIComponent(item.id)}`;
