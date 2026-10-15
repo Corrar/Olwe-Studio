@@ -3,7 +3,8 @@ import { and, eq, isNull, lte, or } from "drizzle-orm";
 import { headers } from "next/headers";
 import { db } from "@/db";
 import { users } from "@/db/schema";
-import { emailEnabled, linkEmail, sendEmail } from "./email";
+import { emailEnabled, sendEmail } from "./email";
+import { brandEmail } from "./email-template";
 import { withinLimit } from "./rate-limit";
 import { readToken, signToken } from "./session";
 
@@ -43,15 +44,27 @@ export async function siteUrl() {
   return `${proto}://${host}`;
 }
 
-const verificationMessage = (link: string) =>
-  linkEmail({
+const VERIFY_SUBJECT = "Confirme seu e-mail no Olwe";
+
+const verificationMessage = (base: string, link: string) =>
+  brandEmail({
+    base,
+    hero: "welcome",
+    subject: VERIFY_SUBJECT,
+    preheader: "Falta um passo: confirme seu e-mail e comece a assistir no Olwe.",
+    eyebrow: "Bem-vindo ao Olwe",
     heading: "Confirme seu e-mail",
-    body: "Falta só um passo para começar a assistir no Olwe. Toque no botão abaixo para confirmar que este e-mail é seu.",
+    body: "Sua conta está quase pronta. Toque no botão abaixo para confirmar que este e-mail é seu e começar a assistir.",
     button: "Confirmar e-mail",
     link,
     validity: "O link vale por 24 horas.",
+    features: [
+      { icon: "film", title: "Filmes completos, de graça", text: "Clássicos e filmes licenciados para assistir do começo ao fim, em HD." },
+      { icon: "users", title: "Perfis para toda a família", text: "Até 5 perfis, com controle parental e um espaço só para as crianças." },
+      { icon: "sparkles", title: "Grátis ou Premium", text: "No Grátis, só um anúncio curto antes do filme. No Premium, nenhum." },
+    ],
     textLead: "Abra este link para confirmar sua conta no Olwe (vale por 24 horas)",
-    ignore: "Se você não criou uma conta no Olwe, ignore este e-mail.",
+    ignore: "Se você não criou uma conta no Olwe, é só ignorar este e-mail.",
   });
 
 /**
@@ -83,8 +96,9 @@ export async function sendVerificationEmail(
     return "limit";
   }
   const token = await signToken(PURPOSE, { sub: user.id, email: user.email }, `${LINK_LIFETIME_SECONDS}s`);
-  const link = `${await siteUrl()}/verify-email?token=${encodeURIComponent(token)}`;
-  if (await sendEmail({ to: user.email, subject: "Confirme seu e-mail no Olwe", ...verificationMessage(link) })) return "sent";
+  const base = await siteUrl();
+  const link = `${base}/verify-email?token=${encodeURIComponent(token)}`;
+  if (await sendEmail({ to: user.email, subject: VERIFY_SUBJECT, ...verificationMessage(base, link) })) return "sent";
   await release();
   return "failed";
 }
@@ -122,15 +136,26 @@ async function passwordFingerprint(passwordHash: string) {
     .slice(0, 16);
 }
 
-const resetMessage = (link: string) =>
-  linkEmail({
+const RESET_SUBJECT = "Crie uma nova senha no Olwe";
+
+const resetMessage = (base: string, link: string) =>
+  brandEmail({
+    base,
+    hero: "security",
+    subject: RESET_SUBJECT,
+    preheader: "Use o link para criar uma nova senha. Ele vale por 1 hora.",
+    eyebrow: "Segurança da conta",
     heading: "Crie uma nova senha",
-    body: "Recebemos um pedido para trocar a senha da sua conta no Olwe. Toque no botão abaixo para criar uma nova senha.",
+    body: "Recebemos um pedido para trocar a senha da sua conta no Olwe. Toque no botão abaixo para escolher uma senha nova.",
     button: "Criar nova senha",
     link,
-    validity: "O link vale por 1 hora e deixa de funcionar assim que a senha for trocada.",
+    validity: "O link vale por 1 hora.",
+    features: [
+      { icon: "shield", title: "Não foi você?", text: "Ignore este e-mail. Sua senha atual continua valendo e ninguém entra na conta só com este pedido." },
+      { icon: "clock", title: "Uso único", text: "O link deixa de funcionar assim que a senha nova é salva, e a conta sai dos outros aparelhos." },
+    ],
     textLead: "Abra este link para criar uma nova senha no Olwe (vale por 1 hora)",
-    ignore: "Se você não pediu para trocar a senha, ignore este e-mail: a senha atual continua valendo.",
+    ignore: "Você recebeu este e-mail porque alguém pediu para trocar a senha desta conta no Olwe.",
   });
 
 /**
@@ -145,8 +170,9 @@ export async function sendPasswordResetEmail(email: string) {
   if (!(await withinLimit("email:daily", EMAILS_PER_DAY, 24 * 60 * 60))) return;
   const claims = { sub: user.id, email: user.email, ph: await passwordFingerprint(user.passwordHash) };
   const token = await signToken(RESET_PURPOSE, claims, "1h");
-  const link = `${await siteUrl()}/reset-password?token=${encodeURIComponent(token)}`;
-  await sendEmail({ to: user.email, subject: "Crie uma nova senha no Olwe", ...resetMessage(link) });
+  const base = await siteUrl();
+  const link = `${base}/reset-password?token=${encodeURIComponent(token)}`;
+  await sendEmail({ to: user.email, subject: RESET_SUBJECT, ...resetMessage(base, link) });
 }
 
 /**
