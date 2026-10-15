@@ -7,10 +7,11 @@ import { after } from "next/server";
 import { z } from "zod";
 import { db } from "@/db";
 import { profiles, users } from "@/db/schema";
+import { billingEnabled } from "@/lib/billing";
 import { getCurrentUser } from "@/lib/dal";
 import { emailEnabled } from "@/lib/email";
 import { clientIp, withinLimit } from "@/lib/rate-limit";
-import { createSession, deleteSession, getSessionUserId } from "@/lib/session";
+import { createSession, deleteSession, getSessionUserId, setAfterProfile } from "@/lib/session";
 import {
   confirmEmail,
   EMAILS_PER_DAY,
@@ -42,7 +43,7 @@ const signupSchema = z.object({
   password: z.string().min(8, "A senha precisa ter pelo menos 8 caracteres."),
 });
 
-// Limites de cadastro com envio de e-mail: por IP e por dia no total (EMAILS_PER_DAY, abaixo da cota do Resend).
+// Limites de cadastro com envio de e-mail: por IP e por dia no total (EMAILS_PER_DAY, abaixo da cota do provedor de e-mail).
 const SIGNUPS_PER_IP_PER_HOUR = 5;
 
 export async function signup(_: FormState, formData: FormData): Promise<FormState> {
@@ -89,6 +90,8 @@ export async function signup(_: FormState, formData: FormData): Promise<FormStat
   await db.insert(profiles).values({ id: crypto.randomUUID(), userId, name: name.split(" ")[0], avatar: "ember", maxRating: 16 });
 
   await createSession(userId, 0);
+  // Escolheu o Premium nos cards do cadastro: depois do perfil, vai direto para a assinatura.
+  if (formData.get("plan") === "premium" && billingEnabled()) await setAfterProfile("/plans");
   if (!confirm) redirect("/profiles");
   await sendVerificationEmail({ id: userId, email }, { dailyCounted: true });
   redirect("/confirm-email");

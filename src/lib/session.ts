@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 
 const SESSION_COOKIE = "olwe_session";
 const PROFILE_COOKIE = "olwe_profile";
+const NEXT_COOKIE = "olwe_next";
 const MAX_AGE = 60 * 60 * 24 * 30;
 
 function secretKey() {
@@ -56,6 +57,7 @@ export async function deleteSession() {
   const store = await cookies();
   store.delete(SESSION_COOKIE);
   store.delete(PROFILE_COOKIE);
+  store.delete(NEXT_COOKIE);
 }
 
 // O perfil ativo também vai assinado: com o bloqueio de perfil, não pode ser trocado editando o cookie.
@@ -89,6 +91,26 @@ export async function getActiveProfile(): Promise<{ profileId: string; lockVersi
 /** Sai do perfil ativo (volta para "Quem está assistindo?"). */
 export async function clearActiveProfile() {
   (await cookies()).delete(PROFILE_COOKIE);
+}
+
+/**
+ * Destino depois de escolher o perfil, guardado no cadastro (ex.: quem escolheu o Premium vai para a
+ * assinatura). Só destinos fixos do app: o valor do cookie nunca vira um redirecionamento livre.
+ */
+const AFTER_PROFILE = ["/plans"] as const;
+export type AfterProfile = (typeof AFTER_PROFILE)[number];
+
+export async function setAfterProfile(path: AfterProfile) {
+  (await cookies()).set(NEXT_COOKIE, path, { ...cookieOptions, maxAge: 60 * 60 * 24 });
+}
+
+/** Lê e apaga o destino guardado (vale uma vez só). */
+export async function takeAfterProfile(): Promise<AfterProfile | null> {
+  const store = await cookies();
+  const value = store.get(NEXT_COOKIE)?.value;
+  if (!value) return null;
+  store.delete(NEXT_COOKIE);
+  return (AFTER_PROFILE as readonly string[]).includes(value) ? (value as AfterProfile) : null;
 }
 
 /** Token assinado de uso único por finalidade (ex.: link de confirmação de e-mail). */

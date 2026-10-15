@@ -86,12 +86,15 @@ export function IconBadge({ icon, pulse }: { icon: IconName; pulse?: boolean }) 
  * aviso de Caps Lock e foco no campo a corrigir depois de um erro.
  */
 export function AuthForm({
+  id: formId,
   action,
   fields,
   submitLabel,
   footer,
   username,
 }: {
+  /** Id do <form>: campos fora dele (ex.: a escolha de plano ao lado) entram com o atributo form. */
+  id?: string;
   action: (state: FormState, data: FormData) => Promise<FormState>;
   fields: AuthField[];
   submitLabel: string;
@@ -121,7 +124,7 @@ export function AuthForm({
   };
 
   return (
-    <form ref={formRef} action={formAction} onSubmit={() => setVisible({})} className="w-full">
+    <form id={formId} ref={formRef} action={formAction} onSubmit={() => setVisible({})} className="w-full">
       {username && <input type="text" name="username" autoComplete="username" value={username} readOnly className="hidden" />}
 
       <div role="status" aria-live="polite">
