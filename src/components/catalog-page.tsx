@@ -186,10 +186,11 @@ const PAGES = {
 } as const;
 
 // Telas baixas (celular deitado): o cabeçalho fica acima do destaque em vez de sobre ele.
-// Altura fixa (os gêneros rolam para o lado, sem quebrar linha): o destaque (compactTop) reserva esse
-// espaço no topo, e o texto dele nunca passa por baixo do nome da página e dos gêneros.
+// Até o lg (celular, tablet e telas com zoom alto), o nome da página e os gêneros ficam acima do destaque,
+// e os gêneros quebram linha. Do xl em diante ficam sobre o topo do destaque, numa linha só (cabem com folga),
+// e o destaque (compactTop) reserva essa altura: o texto dele nunca passa por baixo dos gêneros.
 const CATALOG_HEADER =
-  "gutter relative z-10 flex flex-col gap-3 pt-[calc(4.5rem+env(safe-area-inset-top))] sm:absolute sm:inset-x-0 sm:top-0 sm:pt-[calc(5rem+env(safe-area-inset-top))] xl:flex-row xl:items-center xl:gap-6";
+  "gutter relative z-10 flex flex-col gap-3 pt-[calc(4.5rem+env(safe-area-inset-top))] sm:pt-[calc(5rem+env(safe-area-inset-top))] xl:absolute xl:inset-x-0 xl:top-0 xl:flex-row xl:items-center xl:gap-6";
 
 /** Nome da página e seletor de gêneros (chips com ?genre=<id>), sobre o topo do destaque no desktop. */
 function CatalogHeader({ type, selected }: { type: "movie" | "tv"; selected?: number | "all" }) {
@@ -201,8 +202,8 @@ function CatalogHeader({ type, selected }: { type: "movie" | "tv"; selected?: nu
   return (
     <div className={CATALOG_HEADER}>
       <h1 className="font-display text-2xl font-bold tracking-tight sm:text-3xl lg:text-4xl">{page.title}</h1>
-      <nav aria-label="Gêneros" className="-mx-[var(--gutter)] min-w-0 xl:mx-0 xl:flex-1">
-        <ul className="no-scrollbar flex gap-2 overflow-x-auto px-[var(--gutter)] py-1 xl:px-0">
+      <nav aria-label="Gêneros" className="-mx-[var(--gutter)] min-w-0 sm:mx-0 xl:flex-1">
+        <ul className="no-scrollbar flex gap-2 overflow-x-auto px-[var(--gutter)] py-1 sm:flex-wrap sm:overflow-visible sm:px-0 xl:flex-nowrap xl:overflow-x-auto">
           <li>
             <Link href={page.href} aria-current={selected === "all" ? "page" : undefined} className={chip(selected === "all")}>
               Todos os gêneros

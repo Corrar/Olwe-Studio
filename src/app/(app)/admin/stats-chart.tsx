@@ -32,6 +32,13 @@ function niceStep(max: number, whole: boolean) {
  * anterior) e, embaixo, o gráfico diário da métrica escolhida. Mouse, toque e teclado (setas) mostram o
  * valor de cada dia; a tabela com todos os dias fica logo abaixo.
  */
+/** Casas decimais que o passo do eixo tem (0,05 → 2; 2,5 → 1; 20 → 0). */
+function stepDecimals(step: number) {
+  let digits = 0;
+  while (digits < 6 && Math.abs(Math.round(step * 10 ** digits) - step * 10 ** digits) > 1e-9) digits++;
+  return digits;
+}
+
 export function StatsChart({ days, metrics, periodLabel }: { days: string[]; metrics: ChartMetric[]; periodLabel: string }) {
   const [selected, setSelected] = useState(metrics[0].key);
   const [hover, setHover] = useState<number | null>(null);
@@ -41,6 +48,7 @@ export function StatsChart({ days, metrics, periodLabel }: { days: string[]; met
 
   const step = niceStep(Math.max(0, ...metric.values), metric.kind === "count");
   const max = step * TICKS;
+  const decimals = stepDecimals(step);
   const x = (i: number) => (n > 1 ? (i / (n - 1)) * 100 : 50);
   const y = (v: number) => 100 - (Math.max(0, v) / max) * 100;
   const line = metric.values.map((v, i) => `${i ? "L" : "M"}${x(i) * 10},${y(v) * 3}`).join(" ");
@@ -113,7 +121,7 @@ export function StatsChart({ days, metrics, periodLabel }: { days: string[]; met
             {Array.from({ length: TICKS + 1 }, (_, i) => (
               <div key={i} className="absolute inset-x-0 flex items-center" style={{ top: `${(i / TICKS) * 100}%` }}>
                 <span className="h-px flex-1 bg-white/[0.07]" />
-                <span className="w-14 pl-2 text-right text-xs tabular-nums text-muted">{formatMetric(metric.kind, max - i * step, true)}</span>
+                <span className="w-14 pl-2 text-right text-xs tabular-nums text-muted">{formatMetric(metric.kind, max - i * step, true, decimals)}</span>
               </div>
             ))}
           </div>

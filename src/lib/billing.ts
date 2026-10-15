@@ -179,12 +179,28 @@ export async function syncAuthorizedPayment(id: string) {
   await syncSubscription(data.preapproval_id);
 
   const paymentId = data.payment?.id;
-  if (data.payment?.status !== "approved" || paymentId === undefined || data.currency_id !== "BRL") return;
+  if (data.payment?.status !== "approved" || paymentId === undefined) return;
   const subscription = await db.query.subscriptions.findFirst({ where: eq(subscriptions.id, data.preapproval_id), columns: { userId: true } });
   if (!subscription) return;
-  // Tarifa e data de aprovação estão no pagamento em si; sem ele, fica o valor da cobrança.
-  const payment = await mp("GET", `/v1/payments/${encodeURIComponent(String(paymentId))}`).catch(() => null);
-  await recordCharge(`card:${id}`, subscription.userId, "card", payment ?? { transaction_amount: data.transaction_amount, date_approved: data.debit_date });
+  // Valor, tarifa e data de aprovação vêm do pagamento em si. Se a consulta falhar, o erro sobe e o
+  // webhook responde 500: o Mercado Pago reenvia o aviso, em vez de a cobrança ficar sem a tarifa.
+  const payment = await mp("GET", `/v1/payments/${encodeURIComponent(String(paymentId))}`);
+  if (payment.status !== "approved" || payment.currency_id !== "BRL") return;
+  await recordCharge(`card:${paymentId}`, subscription.userId, "card", payment);
+}
+
+/** Estados de um pagamento que devolveu o dinheiro: a cobrança sai da receita do painel. */
+const REVERSED = new Set(["refunded", "charged_back", "cancelled"]);
+
+/**
+ * Aviso de pagamento que não é um Pix do Olwe: pode ser uma mensalidade do cartão estornada ou
+ * contestada. Nesse caso, tira a cobrança da receita do painel.
+ */
+export async function syncCardPayment(id: string) {
+  const charge = await db.query.charges.findFirst({ where: eq(charges.id, `card:${id}`), columns: { id: true } });
+  if (!charge) return;
+  const data = await mp("GET", `/v1/payments/${encodeURIComponent(id)}`);
+  if (REVERSED.has(String(data.status))) await db.delete(charges).where(eq(charges.id, charge.id));
 }
 
 /** Assinatura em andamento da conta (autorizada ou pausada), se houver. */
@@ -262,6 +278,8 @@ export async function syncPayment(id: string, expectedUserId?: string) {
 
   const status = String(data.status ?? row.status);
   await db.update(payments).set({ status }).where(eq(payments.id, id));
+  // Estorno ou contestação depois de aprovado: o dinheiro voltou, então sai da receita do painel.
+  if (REVERSED.has(status)) await db.delete(charges).where(eq(charges.id, `pix:${id}`));
   if (status !== "approved") return { status, charge: pixFromRaw(id, data) };
   await recordCharge(`pix:${id}`, row.userId, "pix", data);
 
