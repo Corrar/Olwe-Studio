@@ -1219,6 +1219,16 @@ function loadYouTubeApi(): Promise<any> {
   return youTubeApi;
 }
 
+/** Desiste de um carregamento que não respondeu: a próxima tentativa baixa o IFrame API do zero. */
+function forgetYouTubeApi() {
+  if (window.YT?.Player) return;
+  youTubeApi = null;
+  document.querySelectorAll('script[src="https://www.youtube.com/iframe_api"]').forEach((s) => s.remove());
+  // O script do YouTube só recomeça se não encontrar o YT anterior, que ficou "carregando". (Não dá para
+  // apagar com delete: o script cria window.YT com var.)
+  window.YT = undefined;
+}
+
 /** Tempo de vídeo tocando com o nome e a classificação na tela, na abertura. */
 const INTRO_MS = 5000;
 /** Sem resposta do YouTube nesse tempo, o player mostra o erro com "Tentar de novo". */
@@ -1289,6 +1299,11 @@ function YouTubePlayer({
       clearTimeout(introTimer);
       introTimer = undefined;
       introLeft -= performance.now() - introFrom;
+      // O prazo venceu antes deste aviso chegar (ex.: app em segundo plano no celular): some agora.
+      if (introLeft <= 0) {
+        introLeft = 0;
+        setIntro(false);
+      }
     };
     const runIntro = () => {
       if (introTimer !== undefined || introLeft <= 0) return;
@@ -1300,7 +1315,19 @@ function YouTubePlayer({
       }, introLeft);
     };
 
-    const giveUp = setTimeout(() => setFailure("load"), YOUTUBE_TIMEOUT_MS);
+    // Sem resposta a tempo, desiste de verdade: o que chegar atrasado não cria nem toca um player escondido
+    // atrás do erro, e "Tentar de novo" baixa o IFrame API do zero.
+    const giveUp = setTimeout(() => {
+      cancelled = true;
+      clearInterval(interval);
+      stats.stopped();
+      player?.destroy?.();
+      player = undefined;
+      playerRef.current = null;
+      host.replaceChildren();
+      forgetYouTubeApi();
+      setFailure("load");
+    }, YOUTUBE_TIMEOUT_MS);
 
     loadYouTubeApi().then(
       (YT) => {

@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { billingEnabled, syncAuthorizedPayment, syncPayment, syncSubscription, validWebhookSignature } from "@/lib/billing";
+import { billingEnabled, syncAuthorizedPayment, syncCardPayment, syncPayment, syncSubscription, validWebhookSignature } from "@/lib/billing";
 
 // Avisos do Mercado Pago (pagamentos e assinaturas). O corpo só diz o que mudou: o estado de verdade
 // é sempre buscado na API dele, então um aviso falso ou repetido não libera nada.
@@ -17,8 +17,10 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    if (type === "payment") await syncPayment(id);
-    else if (type === "subscription_preapproval" || type === "preapproval") await syncSubscription(id);
+    // Pagamento que não é um Pix do Olwe: mensalidade do cartão (estorno ou contestação).
+    if (type === "payment") {
+      if ((await syncPayment(id)) === null) await syncCardPayment(id);
+    } else if (type === "subscription_preapproval" || type === "preapproval") await syncSubscription(id);
     else if (type === "subscription_authorized_payment") await syncAuthorizedPayment(id);
   } catch (err) {
     // Falha ao consultar o Mercado Pago: responde erro para ele reenviar o aviso mais tarde.

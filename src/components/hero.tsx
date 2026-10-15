@@ -21,10 +21,10 @@ const FRAME =
 const CONTENT =
   "gutter flex flex-col items-center pb-14 text-center sm:flex-1 sm:flex-row sm:items-end sm:justify-between sm:gap-6 sm:pb-20 sm:text-left lg:pb-24";
 // Espaço do cabeçalho fixo acima do texto. compact: nas páginas de Filmes e Séries, o nome da página e os
-// gêneros ficam sobre o topo do destaque (no celular, acima dele).
+// gêneros ficam acima do destaque e, do xl em diante, sobre o topo dele (numa linha só, de altura fixa).
 const TOP = {
   default: "pt-[calc(4.5rem+env(safe-area-inset-top))] sm:pt-[calc(5.5rem+env(safe-area-inset-top))]",
-  compact: "pt-4 sm:pt-[calc(12rem+env(safe-area-inset-top))] xl:pt-[calc(9rem+env(safe-area-inset-top))]",
+  compact: "pt-4 xl:pt-[calc(9rem+env(safe-area-inset-top))]",
 };
 // O pôster encolhe em telas baixas para os botões caberem na primeira tela.
 const POSTER =
@@ -97,8 +97,9 @@ export function Hero({
   }, [rotating, current, count]);
 
   const item = items[current];
-  // Sem destaque, só o espaço do cabeçalho fixo (as fileiras sobem um pouco sobre o destaque).
-  if (!item) return <div className={compactTop ? "h-14" : "h-[calc(8rem+env(safe-area-inset-top))]"} />;
+  // Sem destaque, só o espaço do cabeçalho fixo (as fileiras sobem um pouco sobre o destaque). compact: do xl
+  // em diante, também o do nome da página e dos gêneros, que ficam sobre esse espaço.
+  if (!item) return <div className={compactTop ? "h-14 xl:h-[calc(11.5rem+env(safe-area-inset-top))]" : "h-[calc(8rem+env(safe-area-inset-top))]"} />;
 
   const go = (i: number) => setIndex((i + count) % count);
   const details = `/title/${item.type}/${encodeURIComponent(item.id)}`;
@@ -140,7 +141,8 @@ export function Hero({
           </div>
         ))}
         <div className="absolute inset-0 bg-ink/55 sm:bg-transparent sm:bg-gradient-to-r sm:from-ink/90 sm:via-ink/35 sm:to-transparent" />
-        <div className="absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-ink/70 to-transparent" />
+        {/* compact: até o lg, o nome da página fica acima do destaque e o topo dele se funde ao fundo da página. */}
+        <div className={`absolute inset-x-0 top-0 h-32 bg-gradient-to-b to-transparent ${compactTop ? "from-ink xl:from-ink/70" : "from-ink/70"}`} />
         <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-ink via-ink/50 to-transparent sm:h-2/5" />
       </div>
 

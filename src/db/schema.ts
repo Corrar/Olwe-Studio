@@ -180,7 +180,7 @@ export const licensedTitles = sqliteTable("licensed_titles", {
 export const charges = sqliteTable(
   "charges",
   {
-    /** "pix:<id do pagamento>" ou "card:<id da cobrança da assinatura>". */
+    /** "pix:<id do pagamento>" ou "card:<id do pagamento da mensalidade>" (ids do Mercado Pago). */
     id: text("id").primaryKey(),
     /** A receita continua no histórico mesmo se a conta for excluída. */
     userId: text("user_id").references(() => users.id, { onDelete: "set null" }),

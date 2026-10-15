@@ -6,7 +6,6 @@ import { formatCents } from "@/lib/money";
 /** count = quantidade; hours = horas (com uma casa); brl = reais. */
 export type MetricKind = "count" | "hours" | "brl";
 
-const compact = new Intl.NumberFormat("pt-BR", { notation: "compact", maximumFractionDigits: 1 });
 
 export const formatCount = (n: number) => Math.round(n).toLocaleString("pt-BR");
 
@@ -17,11 +16,18 @@ export const dayLabel = (day: string, year = false) =>
 /** Segundos assistidos em horas: "12,5 h". */
 export const formatHours = (seconds: number) => `${(seconds / 3600).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} h`;
 
-/** Valor de uma métrica; short = rótulo do eixo ("1,2 mil", "R$ 1,2 mil"). */
-export function formatMetric(kind: MetricKind, value: number, short = false) {
-  if (kind === "brl") return short ? `R$ ${compact.format(value)}` : formatCents(Math.round(value * 100));
-  if (kind === "hours") return short ? compact.format(value) : `${value.toLocaleString("pt-BR", { maximumFractionDigits: 1 })} h`;
-  return short ? compact.format(value) : formatCount(value);
+/**
+ * Valor de uma métrica. short = rótulo do eixo ("1,2 mil", "R$ 1,2 mil"), com as casas decimais que o
+ * passo do eixo pede (passo 0,05 → "0,05", "0,1"...), para dois rótulos nunca saírem iguais.
+ */
+export function formatMetric(kind: MetricKind, value: number, short = false, decimals = 1) {
+  if (short) {
+    const label = new Intl.NumberFormat("pt-BR", { notation: "compact", maximumFractionDigits: Math.max(1, decimals) }).format(value);
+    return kind === "brl" ? `R$ ${label}` : label;
+  }
+  if (kind === "brl") return formatCents(Math.round(value * 100));
+  if (kind === "hours") return `${value.toLocaleString("pt-BR", { maximumFractionDigits: 1 })} h`;
+  return formatCount(value);
 }
 
 /**
