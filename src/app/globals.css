@@ -152,9 +152,17 @@
 html {
   color-scheme: dark;
   -webkit-tap-highlight-color: transparent;
+  /* Sem barras de rolagem da página (a rolagem continua pelo mouse, toque, trackpad e teclado) e nunca
+     rolagem para os lados: nada passa da largura da tela. */
+  scrollbar-width: none;
+  overflow-x: clip;
   /* O foco do teclado/controle remoto e as âncoras não ficam escondidos atrás do cabeçalho fixo nem da barra de abas. */
   scroll-padding-top: calc(5rem + env(safe-area-inset-top));
   scroll-padding-bottom: calc(var(--tab-bar-h) + env(safe-area-inset-bottom));
+}
+
+html::-webkit-scrollbar {
+  display: none;
 }
 
 body {
