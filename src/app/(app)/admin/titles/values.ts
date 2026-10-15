@@ -1,5 +1,6 @@
 import type { LicensedTitle } from "@/db/schema";
 import { MOVIE_GENRES } from "@/lib/genres";
+import { centsInput } from "@/lib/money";
 import type { TitleFormValues } from "./title-form";
 
 export const GENRE_OPTIONS = Object.entries(MOVIE_GENRES)
@@ -30,6 +31,9 @@ export const EMPTY_VALUES: TitleFormValues = {
   licenseStart: "",
   licenseEnd: "",
   notes: "",
+  costModel: "none",
+  costValue: "",
+  revenueShare: "",
   published: false,
 };
 
@@ -68,6 +72,9 @@ export function valuesOf(row: LicensedTitle): TitleFormValues {
     // Guardado como a meia-noite seguinte ao último dia.
     licenseEnd: row.licenseEnd ? day(new Date(row.licenseEnd.getTime() - 24 * 60 * 60 * 1000)) : "",
     notes: row.notes,
+    costModel: row.costModel,
+    costValue: row.costCents ? centsInput(row.costCents) : "",
+    revenueShare: row.revenueShare ? String(row.revenueShare) : "",
     published: row.published,
   };
 }

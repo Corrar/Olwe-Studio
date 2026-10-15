@@ -2,7 +2,7 @@ import "server-only";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { payments, subscriptions, users } from "@/db/schema";
+import { charges, payments, subscriptions, users } from "@/db/schema";
 import { siteUrl } from "./verification";
 
 // Olwe Premium (sem anúncios) pago pelo Mercado Pago: assinatura mensal no cartão (preapproval) ou
@@ -86,6 +86,33 @@ const toDate = (value: unknown) => {
   return Number.isFinite(time) ? new Date(time) : null;
 };
 
+/**
+ * Guarda a cobrança aprovada para o painel (/admin): valor, tarifa do Mercado Pago e data. O id é fixo
+ * por cobrança, então reprocessar o mesmo aviso não duplica a receita. Falhar aqui não atrapalha o Premium.
+ */
+async function recordCharge(id: string, userId: string, method: "pix" | "card", payment: Raw) {
+  const amount = Number(payment.transaction_amount);
+  if (!Number.isFinite(amount) || amount <= 0) return;
+  const fees = Array.isArray(payment.fee_details)
+    ? payment.fee_details.reduce((sum: number, fee: Raw) => sum + (Number(fee?.amount) || 0), 0)
+    : null;
+  try {
+    await db
+      .insert(charges)
+      .values({
+        id,
+        userId,
+        method,
+        amountCents: Math.round(amount * 100),
+        feeCents: fees === null ? null : Math.round(fees * 100),
+        paidAt: toDate(payment.date_approved) ?? new Date(),
+      })
+      .onConflictDoNothing();
+  } catch (err) {
+    console.error("[billing] não foi possível registrar a cobrança", id, err);
+  }
+}
+
 /** Estende o Premium até `until`, sem nunca encurtar o que já foi pago. */
 async function extendUntil(userId: string, until: Date) {
   const seconds = Math.floor(until.getTime() / 1000);
@@ -145,10 +172,19 @@ export async function syncSubscription(id: string, expectedUserId?: string) {
   return status;
 }
 
-/** Cobrança recorrente avisada pelo Mercado Pago: reprocessa a assinatura dela. */
+/** Cobrança recorrente avisada pelo Mercado Pago: reprocessa a assinatura dela e, se paga, registra a receita. */
 export async function syncAuthorizedPayment(id: string) {
   const data = await mp("GET", `/authorized_payments/${encodeURIComponent(id)}`);
-  if (typeof data.preapproval_id === "string") await syncSubscription(data.preapproval_id);
+  if (typeof data.preapproval_id !== "string") return;
+  await syncSubscription(data.preapproval_id);
+
+  const paymentId = data.payment?.id;
+  if (data.payment?.status !== "approved" || paymentId === undefined || data.currency_id !== "BRL") return;
+  const subscription = await db.query.subscriptions.findFirst({ where: eq(subscriptions.id, data.preapproval_id), columns: { userId: true } });
+  if (!subscription) return;
+  // Tarifa e data de aprovação estão no pagamento em si; sem ele, fica o valor da cobrança.
+  const payment = await mp("GET", `/v1/payments/${encodeURIComponent(String(paymentId))}`).catch(() => null);
+  await recordCharge(`card:${id}`, subscription.userId, "card", payment ?? { transaction_amount: data.transaction_amount, date_approved: data.debit_date });
 }
 
 /** Assinatura em andamento da conta (autorizada ou pausada), se houver. */
@@ -227,6 +263,7 @@ export async function syncPayment(id: string, expectedUserId?: string) {
   const status = String(data.status ?? row.status);
   await db.update(payments).set({ status }).where(eq(payments.id, id));
   if (status !== "approved") return { status, charge: pixFromRaw(id, data) };
+  await recordCharge(`pix:${id}`, row.userId, "pix", data);
 
   const [claimed] = await db
     .update(payments)

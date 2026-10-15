@@ -11,6 +11,7 @@ import { MOVIE_GENRES } from "@/lib/genres";
 import { getTitle as getTmdbTitle, isDemoCatalog } from "@/lib/tmdb";
 import { createDirectUpload, deleteAsset, getAsset, muxEnabled, uploadState, type UploadState } from "@/lib/mux";
 import { siteUrl } from "@/lib/verification";
+import { parseMoney } from "@/lib/money";
 import { parseVideoLink } from "@/lib/video-link";
 import type { FormState } from "./auth";
 
@@ -66,6 +67,18 @@ const schema = z.object({
   licenseStart: dateField,
   licenseEnd: dateField,
   notes: z.string().trim().max(4000),
+  costModel: z.enum(["none", "flat", "monthly", "per_view", "share"], { error: "Escolha como a licença é paga." }),
+  costValue: z
+    .string()
+    .trim()
+    .max(20)
+    .refine((v) => !v || parseMoney(v) !== null, "Valor inválido. Ex.: 1.500,00")
+    .transform((v) => (v ? (parseMoney(v) ?? 0) : 0)),
+  revenueShare: z
+    .string()
+    .trim()
+    .refine((v) => !v || (/^\d{1,3}$/.test(v) && Number(v) <= 100), "Use uma porcentagem de 0 a 100.")
+    .transform((v) => (v ? Number(v) : 0)),
 });
 
 /** Início do dia no horário de Brasília (o Brasil não tem mais horário de verão). */
@@ -97,6 +110,10 @@ export async function saveLicensedTitle(_: FormState, formData: FormData): Promi
     .getAll("genres")
     .map(Number)
     .filter((g) => MOVIE_GENRES[g]);
+
+  const paidByValue = data.costModel === "flat" || data.costModel === "monthly" || data.costModel === "per_view";
+  if (paidByValue && data.costValue <= 0) return { error: "Informe o valor da licença.", field: "costValue" };
+  if (data.costModel === "share" && data.revenueShare <= 0) return { error: "Informe a porcentagem da receita.", field: "revenueShare" };
 
   const licenseStart = data.licenseStart ? brazilDay(data.licenseStart) : null;
   // A licença vale até o fim do último dia: guarda a meia-noite do dia seguinte.
@@ -134,6 +151,9 @@ export async function saveLicensedTitle(_: FormState, formData: FormData): Promi
     licenseStart,
     licenseEnd,
     notes: data.notes,
+    costModel: data.costModel,
+    costCents: paidByValue ? data.costValue : 0,
+    revenueShare: data.costModel === "share" ? data.revenueShare : 0,
     published: formData.get("published") === "on",
     updatedAt: new Date(),
   };

@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { integer, primaryKey, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+import { index, integer, primaryKey, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 const createdAt = () =>
   integer("created_at", { mode: "timestamp" }).notNull().default(sql`(unixepoch())`);
@@ -160,9 +160,73 @@ export const licensedTitles = sqliteTable("licensed_titles", {
   licenseEnd: integer("license_end", { mode: "timestamp" }),
   /** Anotações internas (contrato, contato, repasse). Nunca aparecem para o público. */
   notes: text("notes").notNull().default(""),
+  /**
+   * Quanto a licença custa, para o painel: none (sem custo), flat (valor fixo pelo contrato, distribuído
+   * pela janela da licença), monthly (valor por mês), per_view (por visualização) ou share (% da receita).
+   */
+  costModel: text("cost_model", { enum: ["none", "flat", "monthly", "per_view", "share"] }).notNull().default("none"),
+  /** Valor em centavos (flat, monthly e per_view). */
+  costCents: integer("cost_cents").notNull().default(0),
+  /** Percentual da receita do filme repassado ao licenciante (share), de 0 a 100. */
+  revenueShare: integer("revenue_share").notNull().default(0),
   published: integer("published", { mode: "boolean" }).notNull().default(false),
   updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().default(sql`(unixepoch())`),
   createdAt: createdAt(),
+});
+
+/* ------------------------------ Estatísticas (painel /admin) ------------------------------ */
+
+/** Cobranças aprovadas no Mercado Pago (cada Pix e cada mensalidade do cartão): a receita do painel. */
+export const charges = sqliteTable(
+  "charges",
+  {
+    /** "pix:<id do pagamento>" ou "card:<id da cobrança da assinatura>". */
+    id: text("id").primaryKey(),
+    /** A receita continua no histórico mesmo se a conta for excluída. */
+    userId: text("user_id").references(() => users.id, { onDelete: "set null" }),
+    method: text("method", { enum: ["pix", "card"] }).notNull(),
+    /** Valor pago, em centavos. */
+    amountCents: integer("amount_cents").notNull(),
+    /** Tarifa do Mercado Pago, em centavos (null quando ele não informou). */
+    feeCents: integer("fee_cents"),
+    paidAt: integer("paid_at", { mode: "timestamp" }).notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [index("charges_paid_at_idx").on(t.paidAt)],
+);
+
+/** Contas que usaram o Olwe em cada dia ("AAAA-MM-DD" no horário de Brasília): usuários ativos. */
+export const dailyActivity = sqliteTable(
+  "daily_activity",
+  {
+    day: text("day").notNull(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+  },
+  (t) => [primaryKey({ columns: [t.day, t.userId] })],
+);
+
+/** Visualizações, tempo assistido e anúncios exibidos por título e por dia (horário de Brasília). */
+export const titleStats = sqliteTable(
+  "title_stats",
+  {
+    day: text("day").notNull(),
+    mediaType: text("media_type", { enum: ["movie", "tv", "archive", "commons", "licensed"] }).notNull(),
+    itemId: text("item_id").notNull(),
+    /** Sessões com pelo menos 30 segundos assistidos, como no YouTube. */
+    views: integer("views").notNull().default(0),
+    watchSeconds: integer("watch_seconds").notNull().default(0),
+    adImpressions: integer("ad_impressions").notNull().default(0),
+  },
+  (t) => [primaryKey({ columns: [t.day, t.mediaType, t.itemId] })],
+);
+
+/** Configurações do painel (CPM estimado dos anúncios, custos fixos por mês). */
+export const settings = sqliteTable("settings", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().default(sql`(unixepoch())`),
 });
 
 export type User = typeof users.$inferSelect;

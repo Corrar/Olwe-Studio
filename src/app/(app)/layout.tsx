@@ -1,4 +1,5 @@
 import { eq } from "drizzle-orm";
+import { after } from "next/server";
 import { ViewTransition } from "react";
 import { Footer } from "@/components/footer";
 import { Header } from "@/components/header";
@@ -7,10 +8,13 @@ import { OlweIntro } from "@/components/olwe-intro";
 import { db } from "@/db";
 import { profiles } from "@/db/schema";
 import { requireProfile } from "@/lib/dal";
+import { recordActivity } from "@/lib/stats";
 import { isDemoCatalog } from "@/lib/tmdb";
 
 export default async function AppLayout({ children }: LayoutProps<"/">) {
   const profile = await requireProfile();
+  // Usuários ativos do painel: depois de enviar a página, sem atrasá-la.
+  after(() => recordActivity(profile.userId));
   // Perfis da conta para o menu do avatar: só o necessário (o hash do PIN vira só "bloqueado").
   const account = await db.query.profiles.findMany({
     where: eq(profiles.userId, profile.userId),

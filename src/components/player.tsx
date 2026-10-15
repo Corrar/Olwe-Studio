@@ -20,6 +20,7 @@ import { HLS_MIME, type MediaType } from "@/lib/types";
 import { AdBreak } from "./ad-break";
 import { Icon, type IconName } from "./icons";
 import { RatingBadge } from "./rating-badge";
+import { sendStats, useWatchStats } from "./watch-stats";
 
 /** Arquivo de vídeo, do melhor para o pior; height vira o rótulo do menu de qualidade ("1080p"). */
 export type PlayerFile = { src: string; type: string; height: number | null };
@@ -61,7 +62,16 @@ export function Player({ source, poster, adTag, ...props }: PlayerProps) {
   const [adDone, setAdDone] = useState(false);
   // O anúncio só passa antes dos arquivos próprios: no YouTube, quem decide é o dono do vídeo.
   if (source.kind === "files" && adTag && !adDone) {
-    return <AdBreak adTag={adTag} poster={poster} backHref={props.backHref} title={props.title} onDone={() => setAdDone(true)} />;
+    return (
+      <AdBreak
+        adTag={adTag}
+        poster={poster}
+        backHref={props.backHref}
+        title={props.title}
+        onStarted={() => sendStats({ kind: "ad", mediaType: props.mediaType, itemId: props.itemId })}
+        onDone={() => setAdDone(true)}
+      />
+    );
   }
   return source.kind === "youtube" ? (
     <YouTubePlayer videoKey={source.key} {...props} />
@@ -197,6 +207,7 @@ function FilePlayer({
   const toolbarRef = useRef<HTMLDivElement>(null);
   const seekRef = useRef<HTMLInputElement>(null);
   const backRef = useRef<HTMLAnchorElement>(null);
+  const stats = useWatchStats(mediaType, itemId);
 
   const [store] = useState(createMediaStore);
   const media = useSyncExternalStore(store.subscribe, store.get, () => IDLE);
@@ -562,6 +573,7 @@ function FilePlayer({
   }
 
   function onPlaying() {
+    stats.playing();
     // Classificação no canto ao começar, como nas plataformas de streaming.
     if (bugShown.current) return;
     bugShown.current = true;
@@ -615,6 +627,9 @@ function FilePlayer({
         poster={poster ?? undefined}
         onLoadedMetadata={onLoadedMetadata}
         onPlaying={onPlaying}
+        onPause={stats.stopped}
+        onWaiting={stats.stopped}
+        onEnded={stats.stopped}
         onError={() => setFailed(true)}
         onVolumeChange={(e) => {
           try {
@@ -1243,6 +1258,7 @@ function YouTubePlayer({
 }: Omit<PlayerProps, "source" | "poster"> & { videoKey: string }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<any>(null);
+  const stats = useWatchStats(mediaType, itemId);
   const [attempt, setAttempt] = useState(0);
   const [ready, setReady] = useState(false);
   const [playing, setPlaying] = useState(false);
@@ -1313,6 +1329,8 @@ function YouTubePlayer({
             onStateChange: (e: any) => {
               setPlaying(e.data === PLAYING || e.data === BUFFERING);
               setEnded(e.data === ENDED);
+              if (e.data === PLAYING) stats.playing();
+              else stats.stopped();
               if (e.data === PLAYING) {
                 if (replaying) {
                   replaying = false;
@@ -1350,11 +1368,12 @@ function YouTubePlayer({
       clearTimeout(introTimer);
       clearInterval(interval);
       window.removeEventListener("pagehide", save);
+      stats.stopped();
       player?.destroy?.();
       playerRef.current = null;
       host.replaceChildren();
     };
-  }, [videoKey, mediaType, itemId, startAt, trackProgress, attempt]);
+  }, [videoKey, mediaType, itemId, startAt, trackProgress, attempt, stats]);
 
   function retry() {
     setFailure(null);
