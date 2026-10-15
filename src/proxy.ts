@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 // Checagem otimista: só confere se o cookie existe. A validação real fica na camada de dados (src/lib/dal.ts).
-const PROTECTED = ["/confirm-email", "/browse", "/new", "/free", "/movies", "/series", "/title", "/watch", "/search", "/my-list", "/profiles", "/account"];
+const PROTECTED = ["/confirm-email", "/plans", "/admin", "/browse", "/new", "/free", "/movies", "/series", "/title", "/watch", "/search", "/my-list", "/profiles", "/account"];
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;

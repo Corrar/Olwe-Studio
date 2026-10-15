@@ -21,6 +21,7 @@ export const getCurrentUser = cache(async () => {
       emailVerifiedAt: true,
       verificationSentAt: true,
       sessionVersion: true,
+      premiumUntil: true,
     },
   });
   // A senha mudou depois que esta sessão foi aberta: ela não vale mais.

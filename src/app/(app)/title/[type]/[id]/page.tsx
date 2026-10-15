@@ -14,7 +14,8 @@ import { ShareButton } from "@/components/share-button";
 import { SeasonPicker, TitleTabs, type TitleTab } from "@/components/title-tabs";
 import { WatchlistButton } from "@/components/watchlist-button";
 import { getTitle } from "@/lib/catalog";
-import { requireProfile } from "@/lib/dal";
+import { isPremium } from "@/lib/billing";
+import { requireProfile, requireUser } from "@/lib/dal";
 import { limitLabel, type RatingInfo } from "@/lib/classification";
 import { getProgress, isInWatchlist } from "@/lib/library";
 import { accessFor, forViewer, viewerOf, type Viewer } from "@/lib/ratings";
@@ -83,6 +84,7 @@ const BUTTON =
   "inline-flex min-h-12 items-center justify-center gap-2 rounded-full px-7 py-3 font-semibold transition duration-200 ease-out-expo active:scale-[0.97]";
 
 export default async function TitlePage({ params, searchParams }: Props) {
+  const user = await requireUser();
   const profile = await requireProfile();
   const viewer = viewerOf(profile);
   const title = await load(params);
@@ -138,7 +140,9 @@ export default async function TitlePage({ params, searchParams }: Props) {
   ]);
   const resuming = progress && progress.position > 0 && (!progress.duration || progress.position < progress.duration * 0.95);
   // Sem trailer, o vídeo próprio de demonstração (DEMO_VIDEO_URL) faz as vezes dele no player.
-  const canPlay = full ? title.videoSources.length > 0 : !!(title.trailerKey || process.env.DEMO_VIDEO_URL);
+  const canPlay = full ? title.videoSources.length > 0 || !!title.youtubeKey : !!(title.trailerKey || process.env.DEMO_VIDEO_URL);
+  // Exclusivo do Premium: quem está no Olwe Grátis vê o convite para assinar no lugar do play.
+  const needsPremium = !!title.premiumOnly && !isPremium(user);
   const titleHref = `/title/${title.type}/${encodeURIComponent(title.id)}`;
   const watchHref = `/watch/${title.type}/${encodeURIComponent(title.id)}`;
 
@@ -197,7 +201,7 @@ export default async function TitlePage({ params, searchParams }: Props) {
         <div className="gutter relative -mt-12 flex animate-fade-up flex-col gap-4 pb-10 sm:mt-0 sm:max-w-[min(50rem,72%)] sm:gap-5 sm:pb-16 sm:pt-28 xl:max-w-[52rem] 3xl:max-w-[60rem]">
           <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-amber 3xl:text-sm">
             <Icon name={title.type === "tv" ? "tv" : "film"} size={16} />
-            {title.type === "tv" ? "Série" : full ? "Filme clássico" : "Filme"}
+            {title.type === "tv" ? "Série" : title.type === "licensed" ? (title.premiumOnly ? "Exclusivo Premium" : "Filme") : full ? "Filme clássico" : "Filme"}
           </p>
           <h1
             id="titulo"
@@ -250,7 +254,12 @@ export default async function TitlePage({ params, searchParams }: Props) {
           )}
 
           <div className="mt-1 flex flex-wrap items-center gap-3">
-            {canPlay ? (
+            {needsPremium ? (
+              <Link href="/plans" className={`bg-brand ${BUTTON} w-full text-ink shadow-lg shadow-ember/25 hover:brightness-110 sm:w-auto`}>
+                <Icon name="sparkles" size={20} />
+                Assinar o Premium para assistir
+              </Link>
+            ) : canPlay ? (
               <Link href={watchHref} className={`bg-brand ${BUTTON} w-full text-ink shadow-lg shadow-ember/25 hover:brightness-110 sm:w-auto`}>
                 <Icon name="play" size={20} />
                 {full ? (resuming ? `Continuar de ${clock(progress.position)}` : "Assistir filme") : "Ver trailer"}
@@ -347,7 +356,7 @@ function Credits({ title }: { title: TitleDetails }) {
         {title.sourceName && (
           <>
             {" "}
-            · Fonte:{" "}
+            · {title.type === "licensed" ? "Licenciado por" : "Fonte"}:{" "}
             {title.sourceUrl ? (
               <a href={title.sourceUrl} target="_blank" rel="noreferrer" className="text-amber underline-offset-4 hover:underline">
                 {title.sourceName}
@@ -358,7 +367,11 @@ function Credits({ title }: { title: TitleDetails }) {
           </>
         )}
       </p>
-      <p className="mt-2 text-sm text-muted">Filme livre para assistir e compartilhar, tocado a partir do arquivo original da fonte.</p>
+      <p className="mt-2 text-sm text-muted">
+        {title.type === "licensed"
+          ? "Exibido no Olwe com autorização de quem detém os direitos."
+          : "Filme livre para assistir e compartilhar, tocado a partir do arquivo original da fonte."}
+      </p>
     </section>
   );
 }

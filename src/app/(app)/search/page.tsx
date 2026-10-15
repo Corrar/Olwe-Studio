@@ -5,6 +5,7 @@ import { GridSkeleton, Streamed, TitleGrid } from "@/components/catalog-page";
 import { Icon, type IconName } from "@/components/icons";
 import { requireProfile } from "@/lib/dal";
 import { searchFree } from "@/lib/free";
+import { searchLicensed } from "@/lib/licensed";
 import { MOVIE_GENRES, TV_GENRES } from "@/lib/genres";
 import { forViewer, viewerOf, type Viewer } from "@/lib/ratings";
 import { getTopTrending, searchTitles } from "@/lib/tmdb";
@@ -80,7 +81,7 @@ function Results({ id, icon, heading, note, items }: { id: string; icon: IconNam
 }
 
 async function FreeResults({ items }: { items: Promise<Title[]> }) {
-  return <Results id="busca-completos" icon="monitor" heading="Filmes completos e grátis" note="Assista inteiro aqui no Olwe." items={await items} />;
+  return <Results id="busca-completos" icon="monitor" heading="Filmes completos" note="Assista inteiro aqui no Olwe." items={await items} />;
 }
 
 async function TmdbResults({ items }: { items: Promise<Title[]> }) {
@@ -167,7 +168,10 @@ export default async function SearchPage({ searchParams }: PageProps<"/search">)
   }
 
   // Toda lista passa pela classificação do perfil antes de aparecer.
-  const free = searchFree(query, { kids: viewer.isKids }).then((items) => forViewer(items, viewer));
+  // Os licenciados do Olwe vêm primeiro, antes dos acervos abertos.
+  const free = Promise.all([searchLicensed(query), searchFree(query, { kids: viewer.isKids })]).then(([licensed, open]) =>
+    forViewer([...licensed, ...open], viewer),
+  );
   const tmdb = searchTitles(query).then((items) => forViewer(items, viewer));
 
   return (

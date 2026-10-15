@@ -17,6 +17,7 @@ const columns = (kids?: boolean) => [
     title: "Ajuda",
     links: [
       { href: "/account", label: "Conta e plano" },
+      ...(kids ? [] : [{ href: "/plans", label: "Premium sem anúncios" }]),
       // Perfis infantis não gerenciam perfis.
       ...(kids ? [] : [{ href: "/profiles/manage", label: "Perfis e controle parental" }]),
       { href: "/profiles", label: "Trocar de perfil" },
@@ -44,7 +45,7 @@ export function Footer({ demo, app, kids }: { demo?: boolean; app?: boolean; kid
               <span className="font-display text-lg font-semibold lowercase tracking-tight">olwe</span>
             </Link>
             <p className="mt-3 text-pretty">
-              Filmes e séries sem anúncios. Filmes completos só de acervos com licença aberta; nos outros títulos, sinopse e trailer.
+              Filmes e séries grátis, ou sem anúncios no Premium. Filmes completos só de fontes legais; nos outros títulos, sinopse, trailer e onde assistir.
             </p>
           </div>
           {columns(kids).map((col) => (
@@ -66,7 +67,7 @@ export function Footer({ demo, app, kids }: { demo?: boolean; app?: boolean; kid
       <div className={`flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between ${app ? "border-t border-line/60 pt-6" : ""}`}>
         <div className="flex items-center gap-2">
           {!app && <LogoMark size={20} />}
-          <span>© {new Date().getFullYear()} Olwe Studio · Sem anúncios, sempre.</span>
+          <span>© {new Date().getFullYear()} Olwe Studio · Grátis ou Premium sem anúncios.</span>
         </div>
         <p className="max-w-md text-xs">
           {demo

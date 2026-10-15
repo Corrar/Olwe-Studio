@@ -1,9 +1,11 @@
 import "server-only";
 import { getFreeTitle } from "./free";
+import { getLicensedTitle } from "./licensed";
 import { getTitle as getTmdbTitle } from "./tmdb";
 import type { MediaType, TitleDetails } from "./types";
 
 export async function getTitle(type: MediaType, id: string): Promise<TitleDetails | null> {
+  if (type === "licensed") return getLicensedTitle(id);
   return type === "archive" || type === "commons" ? getFreeTitle(type, id) : getTmdbTitle(type, id);
 }
 

@@ -9,6 +9,8 @@ import { Icon, type IconName } from "@/components/icons";
 import { db } from "@/db";
 import { profiles } from "@/db/schema";
 import { MAX_PROFILES } from "@/lib/avatars";
+import { isAdminEmail } from "@/lib/admin";
+import { activeSubscription, dateLabel, isPremium, priceLabel } from "@/lib/billing";
 import { clampLimit, limitLabel } from "@/lib/classification";
 import { requireProfile, requireUser } from "@/lib/dal";
 
@@ -44,6 +46,8 @@ const PILL_LINK =
 export default async function AccountPage() {
   const user = await requireUser();
   const current = await requireProfile();
+  const premium = isPremium(user);
+  const subscription = premium ? await activeSubscription(user.id) : undefined;
   const list = await db.query.profiles.findMany({
     where: eq(profiles.userId, user.id),
     orderBy: profiles.createdAt,
@@ -56,12 +60,42 @@ export default async function AccountPage() {
       <p className="mt-1 mb-8 text-muted">Seu plano, seu acesso e os perfis da casa.</p>
 
       <div className="space-y-4 sm:space-y-5">
-        <Section id="plano" icon="sparkles" title="Plano" order={0}>
-          <p className="text-lg font-semibold">
-            Olwe completo · <span className="text-gradient">sem anúncios</span>
+        <Section
+          id="plano"
+          icon="sparkles"
+          title="Plano"
+          order={0}
+          action={
+            !current.isKids && (
+              <Link href="/plans" className={PILL_LINK}>
+                {premium ? "Gerenciar plano" : "Tirar os anúncios"}
+              </Link>
+            )
+          }
+        >
+          {premium ? (
+            <p className="text-lg font-semibold">
+              Olwe Premium · <span className="text-gradient">sem anúncios</span>
+            </p>
+          ) : (
+            <p className="text-lg font-semibold">
+              Olwe Grátis · <span className="text-muted">com anúncios curtos</span>
+            </p>
+          )}
+          <p className="mt-1 text-sm text-muted">
+            {premium
+              ? subscription?.status === "authorized"
+                ? `Renova todo mês por ${priceLabel()}${subscription.nextPaymentAt ? `. Próxima cobrança: ${dateLabel(subscription.nextPaymentAt)}` : ""}.`
+                : `Ativo até ${dateLabel(user.premiumUntil!)}.`
+              : `Sem anúncios por ${priceLabel()}/mês com o Premium.`}
           </p>
           <ul className="mt-3 grid gap-2 text-sm text-muted sm:grid-cols-2">
-            {[`Até ${MAX_PROFILES} perfis na mesma conta`, "Nenhum anúncio, nunca", "Filmes completos em HD sem custo", "Continue de onde parou"].map((f) => (
+            {[
+              `Até ${MAX_PROFILES} perfis na mesma conta`,
+              premium ? "Nenhum anúncio, em nenhum perfil" : "Perfil infantil sempre sem anúncios",
+              "Filmes completos em HD",
+              "Continue de onde parou",
+            ].map((f) => (
               <li key={f} className="flex items-center gap-2">
                 <Icon name="check" size={16} className="shrink-0 text-amber" />
                 {f}
@@ -123,6 +157,23 @@ export default async function AccountPage() {
             ))}
           </ul>
         </Section>
+
+        {isAdminEmail(user.email) && !current.isKids && (
+          <Section
+            id="admin"
+            icon="settings"
+            title="Administração"
+            order={3}
+            action={
+              <Link href="/admin/titles" className={PILL_LINK}>
+                <Icon name="film" size={16} />
+                Catálogo licenciado
+              </Link>
+            }
+          >
+            <p className="text-sm text-muted">Cadastre filmes licenciados, defina o prazo da licença e escolha se ficam no Grátis ou só no Premium.</p>
+          </Section>
+        )}
 
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-line/60 p-5 sm:p-6">
           <p className="text-sm text-muted">Sair desconecta a conta deste aparelho.</p>

@@ -3,9 +3,10 @@ import { z } from "zod";
 import { db } from "@/db";
 import { progress } from "@/db/schema";
 import { getCurrentProfile } from "@/lib/dal";
+import { MEDIA_TYPES } from "@/lib/types";
 
 const bodySchema = z.object({
-  mediaType: z.enum(["movie", "tv", "archive", "commons"]),
+  mediaType: z.enum(MEDIA_TYPES),
   itemId: z.string().min(1).max(255),
   position: z.number().min(0),
   duration: z.number().min(0),

@@ -8,7 +8,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: { default: "Olwe", template: "%s · Olwe" },
-  description: "Filmes e séries sem anúncios, do seu jeito.",
+  description: "Filmes e séries grátis, ou sem anúncios no Premium.",
   applicationName: "Olwe",
   // Instalado na tela inicial do iPhone/iPad, abre sem a barra do navegador.
   appleWebApp: { capable: true, title: "Olwe", statusBarStyle: "black" },

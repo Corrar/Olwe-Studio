@@ -6,7 +6,10 @@ import { Icon } from "@/components/icons";
 import { Player } from "@/components/player";
 import { RatingBadge } from "@/components/rating-badge";
 import { getTitle } from "@/lib/catalog";
-import { requireProfile } from "@/lib/dal";
+import { adTagFor } from "@/lib/ads";
+import { isPremium } from "@/lib/billing";
+import { playableSources } from "@/lib/licensed";
+import { requireProfile, requireUser } from "@/lib/dal";
 import { getProgress } from "@/lib/library";
 import { accessFor, viewerOf } from "@/lib/ratings";
 import { isFullMovie, isMediaType } from "@/lib/types";
@@ -14,6 +17,7 @@ import { isFullMovie, isMediaType } from "@/lib/types";
 export const metadata: Metadata = { title: "Assistindo" };
 
 export default async function WatchPage({ params }: PageProps<"/watch/[type]/[id]">) {
+  const user = await requireUser();
   const profile = await requireProfile();
   const { type, id } = await params;
   if (!isMediaType(type)) notFound();
@@ -23,6 +27,8 @@ export default async function WatchPage({ params }: PageProps<"/watch/[type]/[id
   const access = await accessFor(title, viewerOf(profile));
   if (access.status === "removed") notFound();
   if (access.status !== "allowed") redirect(`/title/${title.type}/${encodeURIComponent(title.id)}`);
+  // Exclusivo do Premium: sem assinatura, volta para a página do título (que convida a assinar).
+  if (title.premiumOnly && !isPremium(user)) redirect(`/title/${title.type}/${encodeURIComponent(title.id)}`);
 
   const full = isFullMovie(title);
   const progress = full ? await getProgress(profile.id, title.type, title.id) : null;
@@ -31,10 +37,14 @@ export default async function WatchPage({ params }: PageProps<"/watch/[type]/[id
 
   // Filme completo (Commons / Internet Archive) > vídeo próprio (DEMO_VIDEO_URL) > trailer do TMDB.
   const demoUrl = process.env.DEMO_VIDEO_URL;
+  // Filme licenciado publicado no YouTube pelo dono dos direitos: toca no player do YouTube.
+  const videoSources = full ? await playableSources(title) : [];
   const source = full
-    ? title.videoSources.length
-      ? ({ kind: "files", files: title.videoSources.map(({ src, type, height }) => ({ src, type, height })) } as const)
-      : null
+    ? videoSources.length
+      ? ({ kind: "files", files: videoSources.map(({ src, type, height }) => ({ src, type, height })) } as const)
+      : title.youtubeKey
+        ? ({ kind: "youtube", key: title.youtubeKey } as const)
+        : null
     : demoUrl
       ? ({ kind: "files", files: [{ src: demoUrl, type: "video/mp4", height: null }] } as const)
       : title.trailerKey
@@ -56,6 +66,8 @@ export default async function WatchPage({ params }: PageProps<"/watch/[type]/[id
           backHref={detailsHref}
           note={full ? undefined : "Trailer · o filme completo não está disponível no Olwe"}
           poster={title.backdrop}
+          // Intervalo comercial só nos filmes completos, no Olwe Grátis e fora do perfil infantil.
+          adTag={full ? adTagFor(user, profile) : null}
         />
       ) : (
         <div

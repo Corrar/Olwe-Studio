@@ -4,6 +4,7 @@ import { FreeIntro, GridSkeleton, PAGE_TOP, RowSkeleton, RowStack, Streamed, Str
 import { TitleRow } from "@/components/title-row";
 import { requireProfile } from "@/lib/dal";
 import { FREE_SHELVES, getFreeShelf, getFreeShelfPage, KIDS_SHELVES, type FreeShelf } from "@/lib/free";
+import { getLicensedShelf } from "@/lib/licensed";
 import { forViewer, viewerOf, type Viewer } from "@/lib/ratings";
 
 export const metadata: Metadata = { title: "Filmes completos" };
@@ -17,6 +18,12 @@ const PAGE_LINK =
 async function Shelf({ shelf, viewer }: { shelf: FreeShelf; viewer: Viewer }) {
   const items = await forViewer(await getFreeShelf(shelf.key, ROW_SIZE), viewer);
   return <TitleRow title={shelf.label} items={items} href={`/free?shelf=${shelf.key}`} />;
+}
+
+/** Filmes com licença própria do Olwe, antes dos acervos abertos. */
+async function LicensedShelf({ viewer }: { viewer: Viewer }) {
+  const items = await forViewer(await getLicensedShelf({ limit: 30 }), viewer);
+  return <TitleRow title="Licenciados no Olwe" items={items} />;
 }
 
 async function ShelfPage({ shelf, page, viewer }: { shelf: FreeShelf; page: number; viewer: Viewer }) {
@@ -77,6 +84,9 @@ export default async function FreeMoviesPage({ searchParams }: PageProps<"/free"
       <StreamedHero load={async () => forViewer(await getFreeShelf(shelves[0].key, 8), viewer)} />
       <RowStack>
         <FreeIntro />
+        <Streamed fallback={<RowSkeleton label="Licenciados no Olwe" />}>
+          <LicensedShelf viewer={viewer} />
+        </Streamed>
         {shelves.map((s) => (
           <Streamed key={s.key} fallback={<RowSkeleton label={s.label} />}>
             <Shelf shelf={s} viewer={viewer} />

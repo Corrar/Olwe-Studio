@@ -141,6 +141,22 @@ export async function getByGenre(type: TmdbType, genreIds: number[], page = 1): 
   return toList(data, type);
 }
 
+/**
+ * Títulos grátis (com ou sem anúncios) em serviços legais no Brasil, como Pluto TV, Vix e Plex, pelos
+ * dados do JustWatch. Tocam no serviço de origem: a página do título mostra onde assistir.
+ */
+export async function getFreeElsewhere(type: TmdbType, page = 1): Promise<Title[]> {
+  if (isDemoCatalog) return mockList((t) => t.type === type, 1);
+  const data = await tmdb(`/discover/${type}`, {
+    watch_region: REGION,
+    with_watch_monetization_types: "free|ads",
+    sort_by: "popularity.desc",
+    include_adult: "false",
+    page: String(page),
+  });
+  return toList(data, type);
+}
+
 export async function searchTitles(query: string): Promise<Title[]> {
   const q = query.trim();
   if (!q) return [];
