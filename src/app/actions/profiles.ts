@@ -11,7 +11,7 @@ import { AVATARS, MAX_PROFILES } from "@/lib/avatars";
 import { clampLimit } from "@/lib/classification";
 import { getCurrentProfile, requireUser } from "@/lib/dal";
 import { withinLimit } from "@/lib/rate-limit";
-import { clearActiveProfile, setActiveProfileId } from "@/lib/session";
+import { clearActiveProfile, setActiveProfileId, takeAfterProfile } from "@/lib/session";
 import type { FormState } from "./auth";
 
 /** Resultado dos formulários de perfil (limite, bloqueio, PIN). */
@@ -68,7 +68,7 @@ export async function selectProfile(profileId: string) {
   const user = await requireUser();
   const profile = await db.query.profiles.findFirst({
     where: and(eq(profiles.id, profileId), eq(profiles.userId, user.id)),
-    columns: { id: true, pinHash: true },
+    columns: { id: true, pinHash: true, isKids: true },
   });
   if (!profile) redirect("/profiles");
   // Perfil bloqueado: sai do perfil atual e pede o PIN antes de entrar.
@@ -77,7 +77,9 @@ export async function selectProfile(profileId: string) {
     redirect(`/profiles/${profile.id}/unlock`);
   }
   await setActiveProfileId(profile.id);
-  redirect("/browse");
+  // Destino guardado no cadastro (ex.: assinar o Premium). Perfis infantis não contratam planos.
+  const next = await takeAfterProfile();
+  redirect(next && !profile.isKids ? next : "/browse");
 }
 
 /** "Trocar perfil": sai do perfil ativo e volta para a escolha de perfis. */

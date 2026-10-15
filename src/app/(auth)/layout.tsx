@@ -1,3 +1,4 @@
+import { AuthFrame } from "@/components/auth-frame";
 import { Logo } from "@/components/logo";
 
 /**
@@ -21,9 +22,7 @@ export default function AuthLayout({ children }: LayoutProps<"/">) {
       </header>
 
       <main className="gutter flex flex-1 justify-center pb-[calc(3rem+env(safe-area-inset-bottom))] pt-4 sm:items-center sm:pt-0">
-        <div className="w-full max-w-md animate-fade-up sm:rounded-3xl sm:border sm:border-line/80 sm:bg-ink/70 sm:p-10 sm:shadow-2xl sm:shadow-black/60 sm:backdrop-blur-xl">
-          {children}
-        </div>
+        <AuthFrame>{children}</AuthFrame>
       </main>
     </div>
   );
