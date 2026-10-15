@@ -873,29 +873,20 @@ function FilePlayer({
 }
 
 /** Barra de cima: voltar para a página do título, nome e classificação indicativa. */
-function TopBar({
-  title,
-  rating,
-  backHref,
-  note,
-  floating,
-  backRef,
-  className = "",
-}: Info & { floating?: boolean; backRef?: Ref<HTMLAnchorElement>; className?: string }) {
-  const pill = floating ? "bg-black/60 backdrop-blur" : "";
+function TopBar({ title, rating, backHref, note, backRef, className = "" }: Info & { backRef?: Ref<HTMLAnchorElement>; className?: string }) {
   return (
     <div
-      className={`gutter pointer-events-none absolute left-0 top-0 z-30 flex max-w-full items-start gap-2 pt-[max(0.75rem,env(safe-area-inset-top))] sm:gap-3 sm:pt-5 ${floating ? "" : "right-0"} ${className}`}
+      className={`gutter pointer-events-none absolute inset-x-0 top-0 z-30 flex items-start gap-2 pt-[max(0.75rem,env(safe-area-inset-top))] sm:gap-3 sm:pt-5 ${className}`}
     >
       <Link
         ref={backRef}
         href={backHref}
         aria-label={`Voltar para ${title}`}
-        className={`pointer-events-auto grid size-11 shrink-0 place-items-center rounded-full transition hover:bg-white/15 active:scale-90 3xl:size-12 ${pill}`}
+        className="pointer-events-auto grid size-11 shrink-0 place-items-center rounded-full transition hover:bg-white/15 active:scale-90 3xl:size-12"
       >
         <Icon name="arrow-left" size={26} />
       </Link>
-      <div className={`min-w-0 ${floating ? "rounded-2xl px-3.5 py-2" : "pt-1"} ${pill}`}>
+      <div className="min-w-0 pt-1">
         <h1 className="truncate font-display text-base font-semibold leading-tight sm:text-xl 3xl:text-2xl">{title}</h1>
         {/* Como nas plataformas de streaming, a classificação aparece ao abrir o vídeo. */}
         <p className="mt-1 flex min-w-0 items-center gap-2 text-xs text-text/80 sm:text-sm">
@@ -1189,23 +1180,59 @@ declare global {
   }
 }
 
+let youTubeApi: Promise<any> | null = null;
+
+/** Carrega o IFrame API do YouTube uma vez. Se o script não vier (rede, bloqueador), a próxima tentativa carrega de novo. */
 function loadYouTubeApi(): Promise<any> {
   if (window.YT?.Player) return Promise.resolve(window.YT);
-  return new Promise((resolve) => {
+  youTubeApi ??= new Promise((resolve, reject) => {
     const previous = window.onYouTubeIframeAPIReady;
     window.onYouTubeIframeAPIReady = () => {
       previous?.();
       resolve(window.YT);
     };
-    if (!document.querySelector('script[src="https://www.youtube.com/iframe_api"]')) {
-      const s = document.createElement("script");
-      s.src = "https://www.youtube.com/iframe_api";
-      document.head.appendChild(s);
-    }
+    const script = document.createElement("script");
+    script.src = "https://www.youtube.com/iframe_api";
+    script.async = true;
+    script.onerror = () => {
+      script.remove();
+      youTubeApi = null;
+      reject(new Error("YouTube IFrame API"));
+    };
+    document.head.appendChild(script);
   });
+  return youTubeApi;
 }
 
-/** Trailer (YouTube IFrame API): os controles são os do YouTube; por cima, só a barra de voltar. */
+/** Tempo de vídeo tocando com o nome e a classificação na tela, na abertura. */
+const INTRO_MS = 5000;
+/** Sem resposta do YouTube nesse tempo, o player mostra o erro com "Tentar de novo". */
+const YOUTUBE_TIMEOUT_MS = 20_000;
+
+type YouTubeFailure = "load" | "removed" | "embed" | "playback";
+
+const YOUTUBE_FAILURES: Record<YouTubeFailure, { title: string; text: string }> = {
+  load: {
+    title: "Não foi possível carregar o player do YouTube.",
+    text: "Confira a conexão ou se algum bloqueador está impedindo o YouTube, e tente de novo.",
+  },
+  removed: { title: "Este vídeo não está mais disponível.", text: "Ele foi removido do YouTube ou ficou privado." },
+  embed: { title: "Este vídeo só pode ser assistido no YouTube.", text: "Quem publicou o vídeo não permite exibi-lo em outros sites." },
+  playback: { title: "Não foi possível tocar este vídeo agora.", text: "Tente de novo em instantes." },
+};
+
+/** Códigos do onError do IFrame API: 2 e 100 (vídeo inválido ou removido), 101 e 150 (incorporação proibida). */
+function youTubeFailure(code: number): YouTubeFailure {
+  if (code === 101 || code === 150) return "embed";
+  if (code === 2 || code === 100) return "removed";
+  return "playback";
+}
+
+/**
+ * Trailer (YouTube IFrame API): os controles são os do YouTube. Por cima, como na Netflix, o nome, a
+ * classificação e o aviso aparecem nos primeiros segundos de vídeo e somem devagar; fica só o botão de
+ * voltar, discreto. No fim, em vez da grade de vídeos do YouTube, "Assistir de novo" e "Voltar".
+ */
 function YouTubePlayer({
   videoKey,
   mediaType,
@@ -1214,51 +1241,236 @@ function YouTubePlayer({
   trackProgress = true,
   ...info
 }: Omit<PlayerProps, "source" | "poster"> & { videoKey: string }) {
-  const ytRef = useRef<HTMLDivElement>(null);
+  const hostRef = useRef<HTMLDivElement>(null);
+  const playerRef = useRef<any>(null);
+  const [attempt, setAttempt] = useState(0);
+  const [ready, setReady] = useState(false);
+  const [playing, setPlaying] = useState(false);
+  const [ended, setEnded] = useState(false);
+  const [intro, setIntro] = useState(true);
+  const [failure, setFailure] = useState<YouTubeFailure | null>(null);
 
   useEffect(() => {
-    if (!ytRef.current) return;
+    const host = hostRef.current;
+    if (!host) return;
+    // O IFrame API troca o elemento pelo iframe: um div novo a cada tentativa, fora da árvore do React.
+    const el = host.appendChild(document.createElement("div"));
     let player: any;
-    let interval: ReturnType<typeof setInterval>;
+    let interval: ReturnType<typeof setInterval> | undefined;
     let cancelled = false;
     const save = () => {
       if (trackProgress && player?.getCurrentTime) saveProgress(mediaType, itemId, player.getCurrentTime(), player.getDuration());
     };
 
-    loadYouTubeApi().then((YT) => {
-      if (cancelled || !ytRef.current) return;
-      player = new YT.Player(ytRef.current, {
-        host: "https://www.youtube-nocookie.com",
-        videoId: videoKey,
-        width: "100%",
-        height: "100%",
-        playerVars: { autoplay: 1, rel: 0, modestbranding: 1, start: Math.floor(startAt), hl: "pt-BR", cc_lang_pref: "pt" },
-        events: {
-          onStateChange: (e: any) => {
-            if (e.data === YT.PlayerState.PAUSED || e.data === YT.PlayerState.ENDED) save();
+    // A abertura conta só o tempo tocando: carregando ou pausado, o nome continua na tela. Ao assistir
+    // de novo, ela volta.
+    let introLeft = INTRO_MS;
+    let introFrom = 0;
+    let introTimer: ReturnType<typeof setTimeout> | undefined;
+    let replaying = false;
+    const holdIntro = () => {
+      if (introTimer === undefined) return;
+      clearTimeout(introTimer);
+      introTimer = undefined;
+      introLeft -= performance.now() - introFrom;
+    };
+    const runIntro = () => {
+      if (introTimer !== undefined || introLeft <= 0) return;
+      introFrom = performance.now();
+      introTimer = setTimeout(() => {
+        introTimer = undefined;
+        introLeft = 0;
+        setIntro(false);
+      }, introLeft);
+    };
+
+    const giveUp = setTimeout(() => setFailure("load"), YOUTUBE_TIMEOUT_MS);
+
+    loadYouTubeApi().then(
+      (YT) => {
+        if (cancelled) return;
+        const { PLAYING, BUFFERING, PAUSED, ENDED } = YT.PlayerState;
+        player = new YT.Player(el, {
+          host: "https://www.youtube-nocookie.com",
+          videoId: videoKey,
+          width: "100%",
+          height: "100%",
+          playerVars: {
+            autoplay: 1,
+            // No iPhone, toca dentro da página (com o botão de voltar), sem abrir a tela cheia sozinho.
+            playsinline: 1,
+            rel: 0,
+            iv_load_policy: 3,
+            start: Math.floor(startAt),
+            hl: "pt-BR",
+            cc_lang_pref: "pt",
           },
-        },
-      });
-      interval = setInterval(() => player?.getPlayerState?.() === YT.PlayerState.PLAYING && save(), 10_000);
-    });
+          events: {
+            onReady: () => {
+              clearTimeout(giveUp);
+              setReady(true);
+            },
+            onStateChange: (e: any) => {
+              setPlaying(e.data === PLAYING || e.data === BUFFERING);
+              setEnded(e.data === ENDED);
+              if (e.data === PLAYING) {
+                if (replaying) {
+                  replaying = false;
+                  setIntro(true);
+                }
+                runIntro();
+              } else holdIntro();
+              if (e.data === ENDED) {
+                introLeft = INTRO_MS;
+                replaying = true;
+              }
+              if (e.data === PAUSED || e.data === ENDED) save();
+            },
+            onError: (e: any) => {
+              clearTimeout(giveUp);
+              setFailure(youTubeFailure(Number(e.data)));
+            },
+          },
+        });
+        playerRef.current = player;
+        interval = setInterval(() => player?.getPlayerState?.() === PLAYING && save(), 10_000);
+      },
+      () => {
+        if (cancelled) return;
+        clearTimeout(giveUp);
+        setFailure("load");
+      },
+    );
     window.addEventListener("pagehide", save);
 
     return () => {
       cancelled = true;
       save();
+      clearTimeout(giveUp);
+      clearTimeout(introTimer);
       clearInterval(interval);
       window.removeEventListener("pagehide", save);
       player?.destroy?.();
+      playerRef.current = null;
+      host.replaceChildren();
     };
-  }, [videoKey, mediaType, itemId, startAt, trackProgress]);
+  }, [videoKey, mediaType, itemId, startAt, trackProgress, attempt]);
+
+  function retry() {
+    setFailure(null);
+    setReady(false);
+    setPlaying(false);
+    setEnded(false);
+    setIntro(true);
+    setAttempt((n) => n + 1);
+  }
+
+  function replay() {
+    setEnded(false);
+    playerRef.current?.seekTo?.(0, true);
+    playerRef.current?.playVideo?.();
+  }
+
+  const showInfo = intro && !ended && !failure;
+  const descriptors = info.rating.descriptors.join(", ");
+  const youTubeUrl = `https://www.youtube.com/watch?v=${encodeURIComponent(videoKey)}`;
+  const failed = failure ? YOUTUBE_FAILURES[failure] : null;
 
   return (
-    <div className="relative h-full w-full bg-black">
-      {/* O IFrame API troca este div pelo iframe do YouTube. */}
-      <div className="absolute inset-0">
-        <div ref={ytRef} className="h-full w-full" />
+    <div className="relative h-full w-full overflow-hidden bg-black text-text">
+      {/* O IFrame API põe aqui o iframe do YouTube. */}
+      <div ref={hostRef} className="absolute inset-0 [&_iframe]:block [&_iframe]:size-full" />
+
+      {!ready && !failure && (
+        <div className="pointer-events-none absolute inset-0 grid place-items-center">
+          <Spinner />
+        </div>
+      )}
+
+      {/* Abertura: o topo escurece atrás do nome e clareia junto com ele. */}
+      <div
+        aria-hidden="true"
+        className={`pointer-events-none absolute inset-x-0 top-0 z-20 h-52 bg-gradient-to-b from-black/80 via-black/30 to-transparent transition-opacity duration-1000 ease-in-out starting:opacity-0 sm:h-72 ${
+          showInfo ? "" : "opacity-0"
+        }`}
+      />
+      <div className="gutter pointer-events-none absolute inset-x-0 top-0 z-30 flex items-start gap-2 pt-[max(0.75rem,env(safe-area-inset-top))] sm:gap-3 sm:pt-5">
+        <Link
+          href={info.backHref}
+          aria-label={`Voltar para ${info.title}`}
+          className={`pointer-events-auto grid size-11 shrink-0 place-items-center rounded-full bg-black/45 backdrop-blur transition duration-500 hover:bg-black/70 hover:opacity-100 focus-visible:opacity-100 active:scale-90 3xl:size-12 ${
+            playing && !intro ? "opacity-60" : ""
+          }`}
+        >
+          <Icon name="arrow-left" size={26} />
+        </Link>
+        <div className={`min-w-0 pt-0.5 transition-opacity duration-1000 ease-in-out starting:opacity-0 ${showInfo ? "" : "opacity-0"}`}>
+          <h1 className="truncate font-display text-lg font-semibold leading-tight drop-shadow-md sm:text-2xl 3xl:text-3xl">{info.title}</h1>
+          <p className="mt-2 flex min-w-0 items-center gap-2.5 border-l-[3px] border-amber pl-2.5 text-xs text-text/90 drop-shadow sm:text-sm">
+            <RatingBadge rating={info.rating} size="sm" />
+            <span className="truncate">{descriptors || "Classificação indicativa"}</span>
+          </p>
+          {info.note && <p className="mt-2 text-xs text-text/75 drop-shadow sm:text-sm">{info.note}</p>}
+        </div>
       </div>
-      <TopBar {...info} floating />
+
+      {ended && !failure && (
+        <div className="absolute inset-0 z-20 grid animate-fade-in place-items-center bg-black/80 p-6 text-center backdrop-blur-sm">
+          <div className="flex max-w-md flex-col items-center gap-3">
+            <p className="font-display text-2xl font-semibold sm:text-3xl">{info.title}</p>
+            {info.note && <p className="text-sm text-muted">{info.note}</p>}
+            <div className="mt-3 flex flex-wrap justify-center gap-3">
+              <button
+                type="button"
+                autoFocus
+                onClick={replay}
+                className="bg-brand inline-flex min-h-12 items-center gap-2 rounded-full px-6 font-semibold text-ink shadow-lg shadow-ember/25 transition hover:brightness-110 active:scale-[0.97]"
+              >
+                <Icon name="play" size={20} />
+                Assistir de novo
+              </button>
+              <Link
+                href={info.backHref}
+                className="inline-flex min-h-12 items-center rounded-full bg-white/10 px-6 font-semibold ring-1 ring-inset ring-white/15 transition hover:bg-white/20"
+              >
+                Voltar
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {failed && (
+        <div role="alert" className="absolute inset-0 z-20 grid place-items-center bg-black p-6 text-center">
+          <div className="flex max-w-sm flex-col items-center gap-4">
+            <Icon name="alert" size={40} className="text-amber" />
+            <p className="font-display text-xl font-semibold">{failed.title}</p>
+            <p className="text-sm text-muted">{failed.text}</p>
+            <div className="flex flex-wrap justify-center gap-3">
+              {(failure === "load" || failure === "playback") && (
+                <button type="button" onClick={retry} className="bg-brand min-h-12 rounded-full px-6 font-semibold text-ink transition hover:brightness-110">
+                  Tentar de novo
+                </button>
+              )}
+              {failure !== "removed" && (
+                <a
+                  href={youTubeUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`inline-flex min-h-12 items-center rounded-full px-6 font-semibold transition ${
+                    failure === "embed" ? "bg-brand text-ink hover:brightness-110" : "bg-white/10 hover:bg-white/20"
+                  }`}
+                >
+                  Assistir no YouTube
+                </a>
+              )}
+              <Link href={info.backHref} className="inline-flex min-h-12 items-center rounded-full bg-white/10 px-6 font-semibold transition hover:bg-white/20">
+                Voltar
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
